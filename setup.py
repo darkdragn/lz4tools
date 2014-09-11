@@ -7,7 +7,7 @@ VERSION = (0, 8, 0)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 
 setup(
-    name='lz4',
+    name='lz4f',
     version=VERSION_STR,
     description="LZ4 Bindings for Python, fresh with lz4io",
     #long_description=open('README.rst', 'r').read(),
@@ -17,10 +17,10 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     ext_modules=[
-        Extension('lz4', [
+        Extension('lz4f', [
             'src/lz4.c',
             'src/lz4hc.c',
-            'src/python-lz4.c'
+            'src/python-lz4f.c'
         ], extra_compile_args=[
             "-std=c99",
             "-O3",

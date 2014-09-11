@@ -1,26 +1,33 @@
 #!/usr/bin/python
 
 import __builtin__
-import lz4
+import lz4f
 import struct
 import sys
+import tarfile
 
 class Lz4File:
     MAGIC = '0x184d2204'
     blkDict = {}
-    def __init__(self, name, fileObj=None):
-        self.lz4sd = lz4.Lz4sd_t()
+    def __init__(self, name, fileObj=None, seekable=True):
+        self.lz4sd = lz4f.Lz4sd_t()
         self.name = name
         if fileObj:
             self.fileObj = fileObj
             self.end = tell_end(fileObj)
         else:
             return open(name)
+        if seekable:
+            try:
+                self.load_blocks()
+            except:
+                print 'Unable to load blockDict. Possibly not a lz4 file.'
     @classmethod
-    def open(cls, name = None, fileObj = None):
+    def open(cls, name = None, fileObj = None, seekable=True):
         if not name and not fileObj:
             sys.stderr.write('Nothing to open!')
-        fileObj = __builtin__.open(name)
+        if not fileObj:
+            fileObj = __builtin__.open(name)
         magic = struct.unpack('<I', fileObj.read(4))[0]
         if not cls.MAGIC == hex(magic):
              sys.stderr.write('Invalid magic number!')
@@ -40,8 +47,8 @@ class Lz4File:
         cls.reserved3  = (ord(des[1]) >> 0) & 15  # 4 bits
 
         cls.chkBits    = (ord(des[2]) >> 0) & 255 # 8 bits
-
-        return cls(name, fileObj)
+        
+        return cls(name, fileObj, seekable)
     def read_block(self, blkSize = None, uncomp_flag = None,
                    blk = None, setCur = True):
         if blk:
@@ -59,7 +66,7 @@ class Lz4File:
         if uncomp_flag:
             return compData
         else:
-            return lz4.uncompress_continue(compData, self.lz4sd,
+            return lz4f.decompress_continue(compData, self.lz4sd,
                                            self.blkSizeID)
     def read(self, size = -1):
         out = str()
@@ -132,11 +139,27 @@ class Lz4File:
         if self.blkDict:
             return True
         return False
+class Lz4Tar(tarfile.TarFile):
+    @classmethod
+    def lz4open(cls, name=None, mode='r', fileobj=None):
+        if name and not fileobj:
+            fileobj=__builtin__.open(name)
+        elif not name and not fileobj:
+            print 'Unable to open without a name or fileobj'
+            return
+        if not name and hasattr(fileobj.name):
+            name = fileobj.name
+        lz4FileOut = Lz4File.open(fileObj=fileobj)
+        return cls(None, mode, lz4FileOut)
+    tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
+# Generic lz4file methods
 def get_block_size(fileObj):
     size = struct.unpack('<I', fileObj.read(4))[0]
     return size & 0x7FFFFFFF, size >> 31
-def open(name):
-    return Lz4File.open(name)
+def open(name=None, fileObj=None):
+    return Lz4File.open(name, fileObj)
+def openTar(name=None, fileObj=None):
+    return Lz4Tar.lz4open(name, 'r', fileObj)
 def tell_end(fileObj):
     pos = fileObj.tell()
     fileObj.seek(0, 2)
