@@ -7,10 +7,8 @@ import sys
 import tarfile
 
 class Lz4File:
-    MAGIC = '0x184d2204'
     blkDict = {}
     def __init__(self, name, fileObj=None, seekable=True):
-        self.dCtx = lz4f.createDecompContext()
         self.name = name
         if fileObj:
             self.fileObj = fileObj
@@ -28,26 +26,9 @@ class Lz4File:
             sys.stderr.write('Nothing to open!')
         if not fileObj:
             fileObj = __builtin__.open(name)
-        magic = struct.unpack('<I', fileObj.read(4))[0]
-        if not cls.MAGIC == hex(magic):
-             sys.stderr.write('Invalid magic number!')
-
-        des = fileObj.read(3)
-
-        cls.version    = (ord(des[0]) >> 6) & 3   # 2 bits
-        cls.blkIndepen = (ord(des[0]) >> 5) & 1   # 1 bit
-        cls.blkChk     = (ord(des[0]) >> 4) & 1   # 1 bit
-        cls.streamSize = (ord(des[0]) >> 3) & 1   # 1 bit
-        cls.streamChk  = (ord(des[0]) >> 2) & 1   # 1 bit
-        cls.reserved1  = (ord(des[0]) >> 1) & 1   # 1 bit
-        cls.dictionary = (ord(des[0]) >> 0) & 1   # 1 bit
-
-        cls.reserved2  = (ord(des[1]) >> 7) & 1   # 1 bit
-        cls.blkSizeID  = (ord(des[1]) >> 4) & 7   # 3 bits
-        cls.reserved3  = (ord(des[1]) >> 0) & 15  # 4 bits
-
-        cls.chkBits    = (ord(des[2]) >> 0) & 255 # 8 bits
         
+        cls.dCtx = lz4f.createDecompContext()
+        cls.blkSizeID = lz4f.getFrameInfo(fileObj.read(7), cls.dCtx)
         return cls(name, fileObj, seekable)
     def read_block(self, blkSize = None, blk = None, setCur = True):
         if blk:
@@ -58,9 +39,7 @@ class Lz4File:
         if setCur:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
-            #self.pos = self.curBlkData.get('decomp_e')
-        compData = struct.unpack('<%ds' % blkSize,
-                                 self.fileObj.read(blkSize))[0]
+        compData = self.fileObj.read(blkSize)
         return lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
 
     def read(self, size = -1):
@@ -153,7 +132,10 @@ class Lz4Tar(tarfile.TarFile):
 def get_block_size(fileObj):
     size = struct.unpack('<I', fileObj.read(4))[0]
     fileObj.seek(fileObj.tell()-4)
-    return size & 0x7FFFFFFF, size >> 31
+    returnSize = (size & 0x7FFFFFFF)
+    if not returnSize:
+        return 0
+    return returnSize+4
 def open(name=None, fileObj=None):
     return Lz4File.open(name, fileObj)
 def openTar(name=None, fileObj=None):
