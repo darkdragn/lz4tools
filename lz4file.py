@@ -10,7 +10,7 @@ class Lz4File:
     MAGIC = '0x184d2204'
     blkDict = {}
     def __init__(self, name, fileObj=None, seekable=True):
-        self.lz4sd = lz4f.Lz4sd_t()
+        self.dCtx = lz4f.createDecompContext()
         self.name = name
         if fileObj:
             self.fileObj = fileObj
@@ -49,13 +49,11 @@ class Lz4File:
         cls.chkBits    = (ord(des[2]) >> 0) & 255 # 8 bits
         
         return cls(name, fileObj, seekable)
-    def read_block(self, blkSize = None, uncomp_flag = None,
-                   blk = None, setCur = True):
+    def read_block(self, blkSize = None, blk = None, setCur = True):
         if blk:
             self.fileObj.seek(blk.get('compressed_begin'))
             blkSize = blk.get('blkSize')
-            uncomp_flag = blk.get('uncomp_flag')
-        if not blkSize: blkSize, uncomp_flag = get_block_size(self.fileObj)
+        if not blkSize: blkSize = get_block_size(self.fileObj)
         if blkSize == 0: return ''
         if setCur:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
@@ -63,11 +61,8 @@ class Lz4File:
             #self.pos = self.curBlkData.get('decomp_e')
         compData = struct.unpack('<%ds' % blkSize,
                                  self.fileObj.read(blkSize))[0]
-        if uncomp_flag:
-            return compData
-        else:
-            return lz4f.decompress_continue(compData, self.lz4sd,
-                                           self.blkSizeID)
+        return lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+
     def read(self, size = -1):
         out = str()
         if self.seekable:
@@ -103,16 +98,15 @@ class Lz4File:
         self.fileObj.seek(pos)
     def load_blocks(self):
         startPos = self.fileObj.tell()
-        total, blkNum, decomp, pos = 0, 0, 0, 11
-        blkSize, uncomp_flag = get_block_size(self.fileObj)
+        total, blkNum, pos = 0, 0, 7
+        blkSize = get_block_size(self.fileObj)
         while blkSize > 0:
-            data = self.read_block(blkSize, uncomp_flag, setCur=False)
+            data = self.read_block(blkSize, setCur=False)
             total += len(data)
             self.blkDict.update({blkNum: {'compressed_begin': pos,
-                                'decomp_e': total, 'blkSize': blkSize,
-                                'uncomp_flag': uncomp_flag}})
+                                'decomp_e': total, 'blkSize': blkSize}})
             blkNum += 1
-            blkSize, uncomp_flag = get_block_size(self.fileObj)
+            blkSize = get_block_size(self.fileObj)
             pos = self.fileObj.tell()
         del data, total
         self.curBlk = 0
@@ -139,6 +133,8 @@ class Lz4File:
         if self.blkDict:
             return True
         return False
+
+
 class Lz4Tar(tarfile.TarFile):
     @classmethod
     def lz4open(cls, name=None, mode='r', fileobj=None):
@@ -152,9 +148,11 @@ class Lz4Tar(tarfile.TarFile):
         lz4FileOut = Lz4File.open(fileObj=fileobj)
         return cls(None, mode, lz4FileOut)
     tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
+
 # Generic lz4file methods
 def get_block_size(fileObj):
     size = struct.unpack('<I', fileObj.read(4))[0]
+    fileObj.seek(fileObj.tell()-4)
     return size & 0x7FFFFFFF, size >> 31
 def open(name=None, fileObj=None):
     return Lz4File.open(name, fileObj)
