@@ -28,7 +28,8 @@ class Lz4File:
             fileObj = __builtin__.open(name)
         
         cls.dCtx = lz4f.createDecompContext()
-        cls.blkSizeID = lz4f.getFrameInfo(fileObj.read(7), cls.dCtx)
+        cls.fileInfo = lz4f.getFrameInfo(fileObj.read(7), cls.dCtx)
+        cls.blkSizeID = cls.fileInfo.get('blkSize')
         return cls(name, fileObj, seekable)
     def read_block(self, blkSize = None, blk = None, setCur = True):
         if blk:

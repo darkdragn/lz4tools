@@ -9,13 +9,14 @@ VERSION_STR = ".".join([str(x) for x in VERSION])
 setup(
     name='lz4f',
     version=VERSION_STR,
-    description="LZ4 Bindings for Python, fresh with lz4io",
+    description="LZ4F Bindings for Python",
     #long_description=open('README.rst', 'r').read(),
     author='Christopher Jackson',
     author_email='darkdragn.cj@gmail.com',
     url='https://github.com/darkdragn/python-lz4',
-    packages=find_packages('src'),
-    package_dir={'': 'src'},
+    packages=find_packages(),
+    #package_data={'': 'lz4file.py'},
+    py_modules=['lz4file'],
     ext_modules=[
         Extension('lz4f', [
             'src/lz4.c',
@@ -31,10 +32,9 @@ setup(
             "-Wundef",
             "-DVERSION=\"%s\"" % VERSION_STR,
             "-DLZ4_VERSION=\"r122\"",
-        ])
-    ],
-    setup_requires=["nose>=1.0"],
-    test_suite = "nose.collector",
+        ])],
+    #setup_requires=["nose>=1.0"],
+    #test_suite = "nose.collector",
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
