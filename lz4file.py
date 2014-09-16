@@ -16,10 +16,10 @@ class Lz4File:
         else:
             return open(name)
         if seekable:
-            try:
+           # try:
                 self.load_blocks()
-            except:
-                print 'Unable to load blockDict. Possibly not a lz4 file.'
+           # except:
+           #     print 'Unable to load blockDict. Possibly not a lz4 file.'
     @classmethod
     def open(cls, name = None, fileObj = None, seekable=True):
         if not name and not fileObj:
@@ -40,8 +40,14 @@ class Lz4File:
         if setCur:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
+        if (self.fileObj.tell() + blkSize + 8) == self.end:
+            compData = self.fileObj.read(blkSize+8)
+            resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+            self.regenDCTX()
+            return resultDict.get('decomp')
         compData = self.fileObj.read(blkSize)
-        return lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+        resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
+        return resultDict.get('decomp')
 
     def read(self, size = -1):
         out = str()
@@ -86,22 +92,40 @@ class Lz4File:
             self.blkDict.update({blkNum: {'compressed_begin': pos,
                                 'decomp_e': total, 'blkSize': blkSize}})
             blkNum += 1
-            blkSize = get_block_size(self.fileObj)
+            if not self.fileObj.tell() == self.end:
+                blkSize = get_block_size(self.fileObj)
+            else:
+                break
             pos = self.fileObj.tell()
         del data, total
         self.curBlk = 0
+        self.decomp = self.read_block(blk=self.blkDict.get(0))
         self.seek(0)
         self.fileObj.seek(startPos)
     def seek(self, offset, whence=0):
+        thisBlk = int()
         if not offset:
             blk = self.blkDict.get(0)
         else:
-            self.curBlk, blk = [[num, b] for num, b in self.blkDict.iteritems()
+            thisBlk, blk = [[num, b] for num, b in self.blkDict.iteritems()
                    if offset < b.get('decomp_e')][0]
-        self.decomp =  self.read_block(blk = blk, setCur=False)
-        self.pos = offset
+        if self.curBlk == thisBlk:
+            self.pos = offset
+        else:
+            self.curBlk = thisBlk
+            self.decomp =  self.read_block(blk = blk, setCur=False)
+            self.pos = offset
     def tell(self):
         return self.pos
+    def regenDCTX(self):
+        #del self.dCtx
+        startPos = self.fileObj.tell()
+        self.fileObj.seek(0)
+        header = self.fileObj.read(7)
+        self.dCtx = lz4f.createDecompContext()
+        frameInfo = lz4f.getFrameInfo(header, self.dCtx)
+        self.fileObj.seek(startPos)
+        del frameInfo, header, startPos
     @property
     def decompPos(self):
         return self.pos - self.curBlkData.get('decomp_e')
