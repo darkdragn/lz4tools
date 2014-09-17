@@ -42,11 +42,11 @@ class Lz4File:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
         if (self.fileObj.tell() + blkSize + 8) == self.end:
-            blkSize += 8
+            #blkSize += 8
             regen = True
         compData = self.fileObj.read(blkSize)
         resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
-        if regen: self.regenDCTX()
+        if 'regen' in locals(): self.regenDCTX()
         return resultDict.get('decomp')
     def load_blocks(self):
         total, blkNum, pos = 0, 0, 7
@@ -105,10 +105,10 @@ class Lz4File:
     def tell(self):
         return self.pos
     def regenDCTX(self):
-        try:
-            del self.dCtx
-        except AttributeError:
-            pass
+        #try:
+        #    del self.dCtx
+        #except AttributeError:
+        #    pass
         self.dCtx = lz4f.createDecompContext()
         frameInfo = lz4f.getFrameInfo(self.header, self.dCtx)
         del frameInfo
