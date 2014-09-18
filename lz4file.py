@@ -7,12 +7,11 @@ import sys
 import tarfile
 
 class Lz4File:
-    blkDict = {}
     def __init__(self, name, fileObj=None, seekable=True):
         self.name = name
         if fileObj:
             self.fileObj = fileObj
-            self.end = tell_end(fileObj)
+            self.compEnd = tell_end(fileObj)
         else:
             return open(name)
         self.dCtx = lz4f.createDecompContext()
@@ -41,14 +40,15 @@ class Lz4File:
         if setCur:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
-        if (self.fileObj.tell() + blkSize + 8) == self.end:
-            #blkSize += 8
-            regen = True
+        #if (self.fileObj.tell() + blkSize + 8) == self.compEnd:
+        #    #blkSize += 8
+        #    regen = True
         compData = self.fileObj.read(blkSize)
         resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
         if 'regen' in locals(): self.regenDCTX()
         return resultDict.get('decomp')
     def load_blocks(self):
+        self.blkDict = {}
         total, blkNum, pos = 0, 0, 7
         blkSize = get_block_size(self.fileObj)
         while blkSize > 0:
@@ -57,18 +57,23 @@ class Lz4File:
             self.blkDict.update({blkNum: {'compressed_begin': pos,
                                 'decomp_e': total, 'blkSize': blkSize}})
             blkNum += 1
-            if not self.fileObj.tell() == self.end:
+            if not self.fileObj.tell() == self.compEnd:
                 blkSize = get_block_size(self.fileObj)
             else:
                 break
             pos = self.fileObj.tell()
+        self.end = total-1
         del data, total
         self.curBlk = 0
         self.decomp = self.read_block(blk=self.blkDict.get(0))
         self.seek(0)
-    def read(self, size = -1):
+    def read(self, size = None):
+        if not size:
+            size = self.end-self.pos
         out = str()
         decompOld = self.decompPos
+        if self.pos+size > self.end:
+            size = self.end-self.pos
         newPos = self.pos+size
         if self.decompPos+size > -1:
             out += self.decomp[decompOld:]
@@ -105,10 +110,11 @@ class Lz4File:
     def tell(self):
         return self.pos
     def regenDCTX(self):
-        #try:
-        #    del self.dCtx
-        #except AttributeError:
-        #    pass
+        try:
+            lz4f.freeDecompContext(self.dCtx)
+            del self.dCtx
+        except AttributeError:
+            pass
         self.dCtx = lz4f.createDecompContext()
         frameInfo = lz4f.getFrameInfo(self.header, self.dCtx)
         del frameInfo
