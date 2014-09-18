@@ -1,3 +1,10 @@
+# Build objects
+nose*
 build/
+dist/
+*egg-info/
 *.so
 *.pyc
+
+# Edit objects
+*.swp

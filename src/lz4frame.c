@@ -131,7 +131,6 @@ typedef struct {
 	unsigned dStage;
 	size_t maxBlockSize;
 	size_t maxBufferSize;
-	size_t sizeToDecode;
 	const BYTE* srcExpect;
 	BYTE*  tmpIn;
 	size_t tmpInSize;
@@ -205,13 +204,14 @@ int LZ4F_isError(LZ4F_errorCode_t code)
 /**************************************
    Simple compression functions
 **************************************/
-size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_frameInfo_t* frameInfoPtr)
+size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
 	LZ4F_preferences_t prefs = { 0 };
 	size_t headerSize;
 	size_t streamSize;
 
-	if (frameInfoPtr!=NULL) prefs.frameInfo = *frameInfoPtr;
+	if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+	prefs.autoFlush = 1;
 
 	headerSize = 7;      /* basic header size (no option) including magic number */
 	streamSize = LZ4F_compressBound(srcSize, &prefs);
@@ -231,36 +231,37 @@ size_t LZ4F_compressFrameBound(size_t srcSize, const LZ4F_frameInfo_t* frameInfo
  */
 size_t LZ4F_compressFrame(void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_preferences_t* preferencesPtr)
 {
-	const LZ4F_frameInfo_t frameInfoNull = { 0 };
-	const LZ4F_frameInfo_t* const frameInfoPtr = (preferencesPtr==NULL) ? &frameInfoNull : &(preferencesPtr->frameInfo);
-	LZ4F_compressionContext_t cctx = NULL;
+    LZ4F_cctx_internal_t cctxI = { 0 };   /* works because no allocation */
+    LZ4F_preferences_t prefs = { 0 };
+	LZ4F_compressOptions_t options = { 0 };
 	LZ4F_errorCode_t errorCode;
 	BYTE* const dstStart = (BYTE*) dstBuffer;
 	BYTE* dstPtr = dstStart;
 	BYTE* const dstEnd = dstStart + dstMaxSize;
 
 
-	if (dstMaxSize < LZ4F_compressFrameBound(srcSize, frameInfoPtr))
+    if (preferencesPtr!=NULL) prefs = *preferencesPtr;
+    cctxI.version = LZ4F_VERSION;
+    cctxI.maxBufferSize = 64 KB;   /* mess with real buffer size, to prevent allocation; works because autoflush==1 & stableSrc==1 */
+    prefs.autoFlush = 1;
+    options.stableSrc = 1;
+    if (srcSize <= 64 KB) prefs.frameInfo.blockMode = blockIndependent;   /* no need for linked blocks */
+
+	if (dstMaxSize < LZ4F_compressFrameBound(srcSize, &prefs))
 		return -ERROR_dstMaxSize_tooSmall;
 
-	errorCode = LZ4F_createCompressionContext(&cctx, LZ4F_VERSION);
-	if (LZ4F_isError(errorCode)) return errorCode;
-
-	errorCode = LZ4F_compressBegin(cctx, dstBuffer, dstMaxSize, preferencesPtr);  /* write header */
+	errorCode = LZ4F_compressBegin(&cctxI, dstBuffer, dstMaxSize, &prefs);  /* write header */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;   /* header size */
 
 	dstMaxSize -= errorCode;
-    errorCode = LZ4F_compress(cctx, dstPtr, dstMaxSize, srcBuffer, srcSize, NULL);
+    errorCode = LZ4F_compressUpdate(&cctxI, dstPtr, dstMaxSize, srcBuffer, srcSize, &options);
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;
 
-	errorCode = LZ4F_compressEnd(cctx, dstPtr, dstEnd-dstPtr, NULL);   /* flush last block, and generate suffix */
+	errorCode = LZ4F_compressEnd(&cctxI, dstPtr, dstEnd-dstPtr, &options);   /* flush last block, and generate suffix */
 	if (LZ4F_isError(errorCode)) return errorCode;
 	dstPtr += errorCode;
-
-	errorCode = LZ4F_freeCompressionContext(cctx);
-	if (LZ4F_isError(errorCode)) return errorCode;
 
 	return (dstPtr - dstStart);
 }
@@ -318,6 +319,7 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 	BYTE* const dstStart = (BYTE*)dstBuffer;
 	BYTE* dstPtr = dstStart;
 	BYTE* headerStart;
+	size_t requiredBuffSize;
 
 	if (dstMaxSize < LZ4F_MAXHEADERFRAME_SIZE) return -ERROR_dstMaxSize_tooSmall;
 	if (cctxPtr->cStage != 0) return -ERROR_GENERIC;
@@ -327,15 +329,19 @@ size_t LZ4F_compressBegin(LZ4F_compressionContext_t compressionContext, void* ds
 	cctxPtr->prefs = *preferencesPtr;
 	if (cctxPtr->prefs.frameInfo.blockSizeID == 0) cctxPtr->prefs.frameInfo.blockSizeID = LZ4F_BLOCKSIZEID_DEFAULT;
 	cctxPtr->maxBlockSize = LZ4F_getBlockSize(cctxPtr->prefs.frameInfo.blockSizeID);
-	if (cctxPtr->maxBufferSize < cctxPtr->maxBlockSize + (cctxPtr->prefs.frameInfo.blockMode == blockLinked))
+
+	requiredBuffSize = cctxPtr->maxBlockSize + ((cctxPtr->prefs.frameInfo.blockMode == blockLinked) * 128 KB);
+	if (preferencesPtr->autoFlush)
+        requiredBuffSize = (cctxPtr->prefs.frameInfo.blockMode == blockLinked) * 64 KB;   /* just needs dict */
+
+	if (cctxPtr->maxBufferSize < requiredBuffSize)
     {
-        cctxPtr->maxBufferSize = cctxPtr->maxBlockSize;
-        if (cctxPtr->prefs.frameInfo.blockMode == blockLinked) cctxPtr->maxBufferSize += 128 KB;
+        cctxPtr->maxBufferSize = requiredBuffSize;
         FREEMEM(cctxPtr->tmpBuff);
-        cctxPtr->tmpBuff = ALLOCATOR(cctxPtr->maxBufferSize);
+        cctxPtr->tmpBuff = ALLOCATOR(requiredBuffSize);
         if (cctxPtr->tmpBuff == NULL) return -ERROR_allocation_failed;
-        cctxPtr->tmpIn = cctxPtr->tmpBuff;
     }
+    cctxPtr->tmpIn = cctxPtr->tmpBuff;
     cctxPtr->tmpInSize = 0;
 	XXH32_resetState(&(cctxPtr->xxh), 0);
 	LZ4_resetStream(&(cctxPtr->lz4ctx));
@@ -370,9 +376,8 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
     LZ4F_frameInfo_t* frameInfoPtr = (LZ4F_frameInfo_t*)preferencesPtr;   /* works because prefs starts with frameInfo */
 	blockSizeID_t bid = (frameInfoPtr==NULL) ? LZ4F_BLOCKSIZEID_DEFAULT : frameInfoPtr->blockSizeID;
 	size_t blockSize = LZ4F_getBlockSize(bid);
-	unsigned bufferize = !(preferencesPtr->autoFlush);
 	unsigned nbBlocks = (srcSize / blockSize) + 1;
-	size_t lastBlockSize = bufferize ? blockSize : srcSize % blockSize;
+	size_t lastBlockSize = preferencesPtr->autoFlush ? srcSize % blockSize : blockSize;
 	size_t blockInfo = 4;   /* default, without block CRC option */
 	size_t frameEnd = 4 + (frameInfoPtr->contentChecksumFlag*4);
 	size_t result = (blockInfo * nbBlocks) + (blockSize * (nbBlocks-1)) + lastBlockSize + frameEnd;
@@ -381,17 +386,37 @@ size_t LZ4F_compressBound(size_t srcSize, const LZ4F_preferences_t* preferencesP
 }
 
 
-/* LZ4F_compress()
- * You can then call LZ4F_compress() repetitively to compress as much data as necessary.
+typedef int (*compressFunc_t)(void*, const char*, char*, int, int);
+
+static size_t LZ4F_compressBlock(void* dst, const void* src, size_t srcSize, compressFunc_t compress, void* lz4ctx)
+{
+    /* compress one block */
+    BYTE* cSizePtr = (BYTE*)dst;
+    U32 cSize;
+    cSize = (U32)compress(lz4ctx, (const char*)src, (char*)(cSizePtr+4), (int)(srcSize), (int)(srcSize-1));
+    LZ4F_writeLE32(cSizePtr, cSize);
+    if (cSize == 0)   /* compression failed */
+    {
+        cSize = srcSize;
+        LZ4F_writeLE32(cSizePtr, srcSize + LZ4F_BLOCKUNCOMPRESSED_FLAG);
+        memcpy(cSizePtr+4, src, srcSize);
+    }
+    return cSize + 4;
+}
+
+
+typedef enum { notDone, fromTmpBuffer, fromSrcBuffer } LZ4F_lastBlockStatus;
+
+/* LZ4F_compressUpdate()
+ * LZ4F_compressUpdate() can be called repetitively to compress as much data as necessary.
  * The most important rule is that dstBuffer MUST be large enough (dstMaxSize) to ensure compression completion even in worst case.
- * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
- * Conversely, given a fixed dstMaxSize value, you can know the maximum srcSize authorized using LZ4F_getMaxSrcSize()
  * If this condition is not respected, LZ4F_compress() will fail (result is an errorCode)
+ * You can get the minimum value of dstMaxSize by using LZ4F_compressBound()
  * The LZ4F_compressOptions_t structure is optional : you can provide NULL as argument.
- * The result of the function is the number of bytes written into dstBuffer (it can be zero, meaning input data is just stored within compressionContext for a future block to complete)
+ * The result of the function is the number of bytes written into dstBuffer : it can be zero, meaning input data was just buffered.
  * The function outputs an error code if it fails (can be tested using LZ4F_isError())
  */
-size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr)
+size_t LZ4F_compressUpdate(LZ4F_compressionContext_t compressionContext, void* dstBuffer, size_t dstMaxSize, const void* srcBuffer, size_t srcSize, const LZ4F_compressOptions_t* compressOptionsPtr)
 {
 	LZ4F_compressOptions_t cOptionsNull = { 0 };
 	LZ4F_cctx_internal_t* cctxPtr = (LZ4F_cctx_internal_t*)compressionContext;
@@ -400,9 +425,8 @@ size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuff
 	const BYTE* const srcEnd = srcPtr + srcSize;
 	BYTE* const dstStart = (BYTE*)dstBuffer;
 	BYTE* dstPtr = dstStart;
-	U32 lastBlockCompressed = 0;
-	int (*compress)(void*, const char*, char*, int, int);
-
+	LZ4F_lastBlockStatus lastBlockCompressed = notDone;
+	compressFunc_t compress;
 
 
 	if (cctxPtr->cStage != 1) return -ERROR_GENERIC;
@@ -424,75 +448,69 @@ size_t LZ4F_compress(LZ4F_compressionContext_t compressionContext, void* dstBuff
 			memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, srcSize);
 			srcPtr = srcEnd;
 			cctxPtr->tmpInSize += srcSize;
+			/* still needs some CRC */
 		}
 		else
 		{
 			/* complete tmpIn block and then compress it */
-			BYTE* cSizePtr = dstPtr;
-			U32 cSize;
-			lastBlockCompressed = 1;
+			lastBlockCompressed = fromTmpBuffer;
 			memcpy(cctxPtr->tmpIn + cctxPtr->tmpInSize, srcBuffer, sizeToCopy);
 			srcPtr += sizeToCopy;
-			dstPtr += 4;   /* space for cSize */
-			cSize = (U32)compress(&(cctxPtr->lz4ctx), (const char*)cctxPtr->tmpIn, (char*)dstPtr, (int)(blockSize), (int)(blockSize-1));
-			dstPtr += cSize;
-			LZ4F_writeLE32(cSizePtr, cSize);
-			if (cSize == 0)   /* compression failed : non compressible assumed */
-			{
-				cSize = blockSize + LZ4F_BLOCKUNCOMPRESSED_FLAG;
-				LZ4F_writeLE32(cSizePtr, cSize);
-				memcpy(dstPtr, cctxPtr->tmpIn, blockSize);
-				dstPtr += blockSize;
-			}
+
+			dstPtr += LZ4F_compressBlock(dstPtr, cctxPtr->tmpIn, blockSize, compress, &(cctxPtr->lz4ctx));
+
+			if (cctxPtr->prefs.frameInfo.blockMode==blockLinked) cctxPtr->tmpIn += blockSize;
 			cctxPtr->tmpInSize = 0;
 		}
 	}
 
 	while ((size_t)(srcEnd - srcPtr) >= blockSize)
 	{
-		/* compress one block */
-		BYTE* cSizePtr = dstPtr;
-		U32 cSize;
-        lastBlockCompressed = 2;
-		dstPtr += 4;   /* space for cSizePtr */
-		cSize = (U32)compress(&(cctxPtr->lz4ctx), (const char*)srcPtr, (char*)dstPtr, (int)(blockSize), (int)(blockSize-1));
-		dstPtr += cSize;
-		LZ4F_writeLE32(cSizePtr, cSize);
-		if (cSize == 0)   /* compression failed */
-		{
-			cSize = blockSize + LZ4F_BLOCKUNCOMPRESSED_FLAG;
-			LZ4F_writeLE32(cSizePtr, cSize);
-			memcpy(dstPtr, srcPtr, blockSize);
-			dstPtr += blockSize;
-		}
+		/* compress full block */
+        lastBlockCompressed = fromSrcBuffer;
+        dstPtr += LZ4F_compressBlock(dstPtr, srcPtr, blockSize, compress, &(cctxPtr->lz4ctx));
 		srcPtr += blockSize;
 	}
 
-	if ((cctxPtr->prefs.frameInfo.blockMode == blockLinked) && (lastBlockCompressed))
+    if ((cctxPtr->prefs.autoFlush) && (srcPtr < srcEnd))
     {
-        /* last compressed input up to 64 KB become dictionary */
-        if (0 && (lastBlockCompressed==1) &&
-            (cctxPtr->tmpBuff + cctxPtr->maxBufferSize > cctxPtr->tmpIn + cctxPtr->tmpInSize + cctxPtr->maxBlockSize))
+        /* compress remaining input < blockSize */
+        lastBlockCompressed = fromSrcBuffer;
+        dstPtr += LZ4F_compressBlock(dstPtr, srcPtr, srcEnd - srcPtr, compress, &(cctxPtr->lz4ctx));
+		srcPtr  = srcEnd;
+    }
+
+    /* preserve dictionary if necessary */
+    if ((cctxPtr->prefs.frameInfo.blockMode==blockLinked) && (lastBlockCompressed==fromSrcBuffer))
+    {
+        if (compressOptionsPtr->stableSrc)
         {
-            /* in theory, no need to "save", everything is properly stacked and tracked, so where is the problem ? */
-            cctxPtr->tmpIn += cctxPtr->tmpInSize;
+            cctxPtr->tmpIn = cctxPtr->tmpBuff;
         }
         else
         {
-            int result;
-            result = LZ4_saveDict (&(cctxPtr->lz4ctx), (char*)(cctxPtr->tmpBuff), 64 KB);
-            if (result==0) return -ERROR_GENERIC;
-            cctxPtr->tmpIn = cctxPtr->tmpBuff + result;
+            int realDictSize;
+            realDictSize = LZ4_saveDict (&(cctxPtr->lz4ctx), (char*)(cctxPtr->tmpBuff), 64 KB);
+            if (realDictSize==0) return -ERROR_GENERIC;
+            cctxPtr->tmpIn = cctxPtr->tmpBuff + realDictSize;
         }
     }
 
-	if (srcPtr < srcEnd)   /* some input data left */
-	{
-		/* fill tmp buffer */
-		size_t sizeToCopy = srcEnd - srcPtr;
-		memcpy(cctxPtr->tmpIn, srcPtr, sizeToCopy);
-		cctxPtr->tmpInSize = sizeToCopy;
-	}
+    /* keep tmpIn within limits */
+    if ((cctxPtr->tmpIn + blockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize))   /* necessarily blockLinked && lastBlockCompressed==fromTmpBuffer */
+    {
+        LZ4_saveDict (&(cctxPtr->lz4ctx), (char*)(cctxPtr->tmpBuff), 64 KB);
+        cctxPtr->tmpIn = cctxPtr->tmpBuff + 64 KB;
+    }
+
+    /* some input data left, necessarily < blockSize */
+	if (srcPtr < srcEnd)
+    {
+        /* fill tmp buffer */
+        size_t sizeToCopy = srcEnd - srcPtr;
+        memcpy(cctxPtr->tmpIn, srcPtr, sizeToCopy);
+        cctxPtr->tmpInSize = sizeToCopy;
+    }
 
 	if (cctxPtr->prefs.frameInfo.contentChecksumFlag == contentChecksumEnabled)
 		XXH32_update(&(cctxPtr->xxh), srcBuffer, (unsigned)srcSize);
@@ -528,30 +546,16 @@ size_t LZ4F_flush(LZ4F_compressionContext_t compressionContext, void* dstBuffer,
             (int(*)(void*,const char*,char*,int,int))LZ4_compress_limitedOutput_continue :
             LZ4_compress_limitedOutput_withState;
 
-	{
-		BYTE* cSizePtr = dstPtr;
-		U32 cSize;
-		dstPtr += 4;   /* space for cSizePtr */
-		cSize = (U32)compress(&(cctxPtr->lz4ctx), (const char*)cctxPtr->tmpIn, (char*)dstPtr, (int)(cctxPtr->tmpInSize), (int)(cctxPtr->tmpInSize-1));
-		dstPtr += cSize;
-		LZ4F_writeLE32(cSizePtr, cSize);
-		if (cSize == 0)   /* compression failed */
-		{
-			cSize = cctxPtr->tmpInSize + LZ4F_BLOCKUNCOMPRESSED_FLAG;
-			LZ4F_writeLE32(cSizePtr, cSize);
-			memcpy(dstPtr, cctxPtr->tmpIn, cctxPtr->tmpInSize);
-			dstPtr += cctxPtr->tmpInSize;
-		}
-		cctxPtr->tmpInSize = 0;
-	}
+    /* compress tmp buffer */
+    dstPtr += LZ4F_compressBlock(dstPtr, cctxPtr->tmpIn, cctxPtr->tmpInSize, compress, &(cctxPtr->lz4ctx));
+    if (cctxPtr->prefs.frameInfo.blockMode==blockLinked) cctxPtr->tmpIn += cctxPtr->tmpInSize;
+	cctxPtr->tmpInSize = 0;
 
-	if ((cctxPtr->prefs.frameInfo.blockMode == blockLinked)
-        )//&& (cctxPtr->maxBufferSize < (cctxPtr->tmpIn - cctxPtr->tmpDict) + cctxPtr->tmpInSize + cctxPtr->maxBlockSize ))
+    /* keep tmpIn within limits */
+    if ((cctxPtr->tmpIn + cctxPtr->maxBlockSize) > (cctxPtr->tmpBuff + cctxPtr->maxBufferSize))   /* necessarily blockLinked */
     {
-        /* last 64 KB of input become dictionary */
-        int result = LZ4_saveDict (&(cctxPtr->lz4ctx), (char*)(cctxPtr->tmpBuff), 64 KB);
-        if (!result) return ERROR_GENERIC;
-        cctxPtr->tmpIn = cctxPtr->tmpBuff + result;
+        LZ4_saveDict (&(cctxPtr->lz4ctx), (char*)(cctxPtr->tmpBuff), 64 KB);
+        cctxPtr->tmpIn = cctxPtr->tmpBuff + 64 KB;
     }
 
 	return dstPtr - dstStart;
@@ -660,7 +664,6 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const BYTE* srcPt
 
     /* validate */
     if (version != 1) return -ERROR_GENERIC;   /* Version Number, only supported value */
-    //if (blockMode != blockIndependent) return -ERROR_GENERIC;   /* Only supported blockMode for the time being */
     if (blockChecksumFlag != 0) return -ERROR_GENERIC;   /* Only supported value for the time being */
     if (contentSizeFlag != 0) return -ERROR_GENERIC;   /* Only supported value for the time being */
     if (((FLG>>1)&_1BIT) != 0) return -ERROR_GENERIC;   /* Reserved bit */
@@ -679,7 +682,7 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const BYTE* srcPt
     if (contentChecksumFlag) XXH32_resetState(&(dctxPtr->xxh), 0);
 
     /* alloc */
-    bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==blockLinked) * 64 KB);
+    bufferNeeded = dctxPtr->maxBlockSize + ((dctxPtr->frameInfo.blockMode==blockLinked) * 128 KB);
     if (bufferNeeded > dctxPtr->maxBufferSize)   /* tmp buffers too small */
     {
         FREEMEM(dctxPtr->tmpIn);
@@ -690,10 +693,9 @@ static size_t LZ4F_decodeHeader(LZ4F_dctx_internal_t* dctxPtr, const BYTE* srcPt
         dctxPtr->tmpOutBuffer= ALLOCATOR(dctxPtr->maxBufferSize);
         if (dctxPtr->tmpOutBuffer== NULL) return -ERROR_GENERIC;
     }
-    dctxPtr->tmpOut = dctxPtr->tmpOutBuffer;
-    if (dctxPtr->frameInfo.blockMode==blockLinked) dctxPtr->tmpOut += 64 KB;
+    dctxPtr->dict = dctxPtr->tmpOutBuffer;
     dctxPtr->dictSize = 0;
-    dctxPtr->dict = dctxPtr->tmpOut;
+    dctxPtr->tmpOut = dctxPtr->tmpOutBuffer;
 
     return 7;
 }
@@ -711,27 +713,33 @@ typedef enum { dstage_getHeader=0, dstage_storeHeader, dstage_decodeHeader,
  * It is optional : you could start by calling directly LZ4F_decompress() instead.
  * The objective is to extract header information without starting decompression, typically for allocation purposes.
  * LZ4F_getFrameInfo() can also be used *after* starting decompression, on a valid LZ4F_decompressionContext_t.
- * The number of bytes read from srcBuffer will be provided within *srcSize (necessarily <= original value).
- * The function result is an error code which can be tested using LZ4F_isError().
+ * The number of bytes read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
+ * You are expected to resume decompression from where it stopped (srcBuffer + *srcSizePtr)
+ * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress,
+ * or an error code which can be tested using LZ4F_isError().
  */
-LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSize)
+LZ4F_errorCode_t LZ4F_getFrameInfo(LZ4F_decompressionContext_t decompressionContext, LZ4F_frameInfo_t* frameInfoPtr, const void* srcBuffer, size_t* srcSizePtr)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)decompressionContext;
 
-    if (dctxPtr->dStage==0)
+    if (dctxPtr->dStage == dstage_getHeader)
     {
-        LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcBuffer, *srcSize);
+        LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, srcBuffer, *srcSizePtr);
         if (LZ4F_isError(errorCode)) return errorCode;
-        *srcSize = errorCode;
-        dctxPtr->dStage = dstage_getCBlockSize;
+        if ((*srcSizePtr - errorCode) > 0)
+        {
+            *srcSizePtr = errorCode;
+            dctxPtr->srcExpect = (BYTE*)srcBuffer + errorCode;
+        }
         *frameInfoPtr = dctxPtr->frameInfo;
-        return OK_NoError;
+        dctxPtr->dStage = dstage_getCBlockSize;
+        return 4;
     }
 
     /* frameInfo already decoded */
-    *srcSize = 0;
+    *srcSizePtr = 0;
     *frameInfoPtr = dctxPtr->frameInfo;
-    return OK_NoError;
+    return 0;
 }
 
 
@@ -741,11 +749,46 @@ static void LZ4F_saveDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* decoded, si
     size_t preserveDictSize;
     if (newDictSize > 64 KB) newDictSize = 64 KB;
     preserveDictSize = 64 KB - newDictSize;
-    memmove(dctxPtr->tmpOutBuffer, dctxPtr->tmpOutBuffer + newDictSize, preserveDictSize);
-    memcpy(dctxPtr->tmpOutBuffer + preserveDictSize, decoded + decodedSize - newDictSize, newDictSize);
-    dctxPtr->dictSize += newDictSize;
-    if (dctxPtr->dictSize > 64 KB) dctxPtr->dictSize = 64 KB;
-    dctxPtr->dict = dctxPtr->tmpOut - dctxPtr->dictSize;
+    if (preserveDictSize > dctxPtr->dictSize) preserveDictSize = dctxPtr->dictSize;
+
+    memmove(dctxPtr->tmpOutBuffer, dctxPtr->dict + dctxPtr->dictSize - preserveDictSize, preserveDictSize);
+    memmove(dctxPtr->tmpOutBuffer + preserveDictSize, decoded + decodedSize - newDictSize, newDictSize);
+
+    dctxPtr->dict = dctxPtr->tmpOutBuffer;
+    dctxPtr->dictSize = preserveDictSize + newDictSize;
+    dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + dctxPtr->dictSize;
+}
+
+
+static void LZ4F_pointDict(LZ4F_dctx_internal_t* dctxPtr, const BYTE* decoded, size_t decodedSize)
+{
+    /* decoded block in the continuity of dictionary */
+    if (dctxPtr->dict + dctxPtr->dictSize == decoded)
+    {
+        dctxPtr->dictSize += decodedSize;
+        if (dctxPtr->dict == dctxPtr->tmpOutBuffer)   /* extended tmp buffer, don't go beyond 128 KB == maxDictSize */
+        {
+            if (dctxPtr->dictSize > 128 KB)
+            {
+                memcpy(dctxPtr->tmpOutBuffer, dctxPtr->tmpOutBuffer + dctxPtr->dictSize - 64 KB, 64 KB);
+                dctxPtr->dictSize = 64 KB;
+            }
+            dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + dctxPtr->dictSize;
+        }
+        return;
+    }
+
+    /* large decoded block */
+    if (decodedSize >= (64 KB - 1))
+    {
+        dctxPtr->dict = (BYTE*)decoded;
+        dctxPtr->dictSize = decodedSize;
+        dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + 64 KB;
+        return;
+    }
+
+    /* small block, and not contiguous : let's save that */
+    LZ4F_saveDict(dctxPtr, decoded, decodedSize);
 }
 
 
@@ -758,35 +801,41 @@ static int LZ4F_decompress_safe (const char* source, char* dest, int compressedS
 
 /* LZ4F_decompress()
  * Call this function repetitively to regenerate data compressed within srcBuffer.
- * The function will attempt to decode *srcSize from srcBuffer, into dstBuffer of maximum size *dstSize.
+ * The function will attempt to decode *srcSizePtr from srcBuffer, into dstBuffer of maximum size *dstSizePtr.
  *
- * The number of bytes generated into dstBuffer will be provided within *dstSize (necessarily <= original value).
+ * The number of bytes regenerated into dstBuffer will be provided within *dstSizePtr (necessarily <= original value).
  *
- * The number of bytes effectively read from srcBuffer will be provided within *srcSize (necessarily <= original value).
+ * The number of bytes effectively read from srcBuffer will be provided within *srcSizePtr (necessarily <= original value).
  * If the number of bytes read is < number of bytes provided, then the decompression operation is not complete.
- * You will have to call it again, using the same src arguments (but eventually different dst arguments).
+ * You will have to call it again, continuing from where it stopped.
  *
- * The function result is an error code which can be tested using LZ4F_isError().
- * When the frame is fully decoded, the function result will be OK_FrameEnd(=1).
+ * The function result is an hint of the better srcSize to use for next call to LZ4F_decompress.
+ * Basically, it's the size of the current (or remaining) compressed block + header of next block.
+ * Respecting the hint provides some boost to performance, since it allows less buffer shuffling.
+ * Note that this is just a hint, you can always provide any srcSize you want.
+ * When a frame is fully decoded, the function result will be 0.
+ * If decompression failed, function result is an error code which can be tested using LZ4F_isError().
  */
-LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext, void* dstBuffer, size_t* dstSize, const void* srcBuffer, size_t* srcSize, const LZ4F_decompressOptions_t* decompressOptionsPtr)
+size_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContext,
+                       void* dstBuffer, size_t* dstSizePtr,
+                       const void* srcBuffer, size_t* srcSizePtr,
+                       const LZ4F_decompressOptions_t* decompressOptionsPtr)
 {
     LZ4F_dctx_internal_t* dctxPtr = (LZ4F_dctx_internal_t*)decompressionContext;
     LZ4F_decompressOptions_t optionsNull = { 0 };
     const BYTE* const srcStart = (const BYTE*)srcBuffer;
-    const BYTE* const srcEnd = srcStart + *srcSize;
+    const BYTE* const srcEnd = srcStart + *srcSizePtr;
     const BYTE* srcPtr = srcStart;
     BYTE* const dstStart = (BYTE*)dstBuffer;
-    BYTE* const dstEnd = dstStart + *dstSize;
+    BYTE* const dstEnd = dstStart + *dstSizePtr;
     BYTE* dstPtr = dstStart;
-    size_t nextCBlockSize=0;
     const BYTE* selectedIn=NULL;
-    LZ4F_errorCode_t goodResult = OK_NoError;
-    int (*decoder)(const char*, char*, int, int, const char*, int);
+    unsigned doAnotherStage = 1;
+    size_t nextSrcSizeHint = 1;
 
 
     if (decompressOptionsPtr==NULL) decompressOptionsPtr = &optionsNull;
-    *srcSize = 0; *dstSize = 0;
+    *srcSizePtr = 0; *dstSizePtr = 0;
 
     /* expect to continue decoding src buffer where it left previously */
     if (dctxPtr->srcExpect != NULL)
@@ -794,10 +843,14 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
         if (srcStart != dctxPtr->srcExpect) return -ERROR_GENERIC;
     }
 
-    while (srcPtr < srcEnd)
+    /* programmed as a state machine */
+
+    while (doAnotherStage)
     {
+
         switch(dctxPtr->dStage)
         {
+
         case dstage_getHeader:
             {
                 if (srcEnd-srcPtr >= 7)
@@ -805,12 +858,13 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
                     selectedIn = srcPtr;
                     srcPtr += 7;
                     dctxPtr->dStage = dstage_decodeHeader;
-                    goto goto_decodeHeader;   /* break would risk leaving the while loop */
+                    break;
                 }
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->dStage = dstage_storeHeader;
-                /* break;    break is useles, since storeHeader follows */
+                break;
             }
+
         case dstage_storeHeader:
             {
                 size_t sizeToCopy = 7 - dctxPtr->tmpInSize;
@@ -818,32 +872,41 @@ LZ4F_errorCode_t LZ4F_decompress(LZ4F_decompressionContext_t decompressionContex
                 memcpy(dctxPtr->header + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 dctxPtr->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
-                if (dctxPtr->tmpInSize < 7) break;   /* src completed; come back later for more */
+                if (dctxPtr->tmpInSize < 7)
+                {
+                    nextSrcSizeHint = (7 - dctxPtr->tmpInSize) + 4;
+                    doAnotherStage = 0;   /* no enough src, wait to get some more */
+                    break;
+                }
                 selectedIn = dctxPtr->header;
                 dctxPtr->dStage = dstage_decodeHeader;
-                /* break;   useless because it follows */
+                break;
             }
+
         case dstage_decodeHeader:
-goto_decodeHeader:
             {
                 LZ4F_errorCode_t errorCode = LZ4F_decodeHeader(dctxPtr, selectedIn, 7);
                 if (LZ4F_isError(errorCode)) return errorCode;
-                /* dctxPtr->dStage = dstage_getCBlockSize; break;     no need to change stage nor break : dstage_getCBlockSize is next stage, and stage will be modified */
+                dctxPtr->dStage = dstage_getCBlockSize;
+                break;
             }
+
         case dstage_getCBlockSize:
             {
+                //fprintf(stdout, "SrcEnd: %i SrcPtr: %i Result: %i\n", srcEnd, srcPtr, (srcEnd-srcPtr));
                 if ((srcEnd - srcPtr) >= 4)
                 {
                     selectedIn = srcPtr;
                     srcPtr += 4;
                     dctxPtr->dStage = dstage_decodeCBlockSize;
-                    goto goto_decodeCBlockSize;   /* required : a break could leave while loop */
+                    break;
                 }
-                /* not enough input to read cBlockSize */
+                /* not enough input to read cBlockSize field */
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->dStage = dstage_storeCBlockSize;
-                /* break;   No need to break : dstage_storeCBlockSize is next block */
+                break;
             }
+
         case dstage_storeCBlockSize:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;
@@ -851,64 +914,76 @@ goto_decodeHeader:
                 memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dctxPtr->tmpInSize += sizeToCopy;
-                if (dctxPtr->tmpInSize < 4) break;   /* not enough input to read CBlockSize */
+                if (dctxPtr->tmpInSize < 4) /* not enough input to get full cBlockSize; wait for more */
+                {
+                    nextSrcSizeHint = 4 - dctxPtr->tmpInSize;
+                    doAnotherStage=0;
+                    break;
+                }
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_decodeCBlockSize;
-                /* break;   No need to break : dstage_decodeCBlockSize is next block */
+                break;
             }
+
         case dstage_decodeCBlockSize:
-goto_decodeCBlockSize:
             {
-                nextCBlockSize = LZ4F_readLE32(selectedIn) & 0x7FFFFFFFU;
-                if (nextCBlockSize==0)   /* no more CBlock */
+                size_t nextCBlockSize = LZ4F_readLE32(selectedIn) & 0x7FFFFFFFU;
+                if (nextCBlockSize==0)   /* frameEnd signal, no more CBlock */
                 {
                     dctxPtr->dStage = dstage_getSuffix;
-                    goto goto_getSuffix;   /* required : a break could leave the while loop */
+                    break;
                 }
-                if (nextCBlockSize > dctxPtr->maxBlockSize) return -ERROR_GENERIC;
-                dctxPtr->sizeToDecode = nextCBlockSize;
-                if (LZ4F_readLE32(selectedIn) & 0x80000000U)   /* uncompressed flag */
+                if (nextCBlockSize > dctxPtr->maxBlockSize) return -ERROR_GENERIC;   /* invalid cBlockSize */
+                dctxPtr->tmpInTarget = nextCBlockSize;
+                if (LZ4F_readLE32(selectedIn) & LZ4F_BLOCKUNCOMPRESSED_FLAG)
                 {
                     dctxPtr->dStage = dstage_copyDirect;
                     break;
                 }
                 dctxPtr->dStage = dstage_getCBlock;
-                goto goto_getCBlock;   /* break risk leaving while loop */
+                if (dstPtr==dstEnd)
+                {
+                    nextSrcSizeHint = nextCBlockSize + 4;
+                    doAnotherStage = 0;
+                }
+                break;
             }
-        case dstage_copyDirect:
+
+        case dstage_copyDirect:   /* uncompressed block */
             {
-                size_t sizeToCopy = dctxPtr->sizeToDecode;
-                if ((size_t)(srcEnd-srcPtr) < sizeToCopy) sizeToCopy = srcEnd-srcPtr;  /* not enough input to read full block */
+                size_t sizeToCopy = dctxPtr->tmpInTarget;
+                if ((size_t)(srcEnd-srcPtr) < sizeToCopy) sizeToCopy = srcEnd - srcPtr;  /* not enough input to read full block */
                 if ((size_t)(dstEnd-dstPtr) < sizeToCopy) sizeToCopy = dstEnd - dstPtr;
                 memcpy(dstPtr, srcPtr, sizeToCopy);
                 if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), srcPtr, sizeToCopy);
-                if (dctxPtr->frameInfo.blockMode==blockLinked)
-                    LZ4F_saveDict(dctxPtr, srcPtr, sizeToCopy);
+                if (dctxPtr->frameInfo.blockMode==blockLinked) LZ4F_pointDict(dctxPtr, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dstPtr += sizeToCopy;
-                if (sizeToCopy == dctxPtr->sizeToDecode)   /* all copied */
+                if (sizeToCopy == dctxPtr->tmpInTarget)   /* all copied */
                 {
                     dctxPtr->dStage = dstage_getCBlockSize;
                     break;
                 }
-                dctxPtr->sizeToDecode -= sizeToCopy;   /* still need to copy more */
-                goto _end;                           /* either In or Out have reached end */
+                dctxPtr->tmpInTarget -= sizeToCopy;   /* still need to copy more */
+                nextSrcSizeHint = dctxPtr->tmpInTarget + 4;
+                doAnotherStage = 0;
+                break;
             }
-        case dstage_getCBlock:
-goto_getCBlock:
+
+        case dstage_getCBlock:   /* entry from dstage_decodeCBlockSize */
             {
-                if ((size_t)(srcEnd-srcPtr) < nextCBlockSize)
+                if ((size_t)(srcEnd-srcPtr) < dctxPtr->tmpInTarget)
                 {
-                    dctxPtr->tmpInTarget = nextCBlockSize;
                     dctxPtr->tmpInSize = 0;
                     dctxPtr->dStage = dstage_storeCBlock;
                     break;
                 }
                 selectedIn = srcPtr;
-                srcPtr += nextCBlockSize;
+                srcPtr += dctxPtr->tmpInTarget;
                 dctxPtr->dStage = dstage_decodeCBlock;
-                goto goto_decodeCBlock;   /* break risks leaving the while loop */
+                break;
             }
+
         case dstage_storeCBlock:
             {
                 size_t sizeToCopy = dctxPtr->tmpInTarget - dctxPtr->tmpInSize;
@@ -916,74 +991,86 @@ goto_getCBlock:
                 memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 dctxPtr->tmpInSize += sizeToCopy;
                 srcPtr += sizeToCopy;
-                if (dctxPtr->tmpInSize < dctxPtr->tmpInTarget) break;   /* need to read more */
+                if (dctxPtr->tmpInSize < dctxPtr->tmpInTarget)  /* need more input */
+                {
+                    nextSrcSizeHint = (dctxPtr->tmpInTarget - dctxPtr->tmpInSize) + 4;
+                    doAnotherStage=0;
+                    break;
+                }
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_decodeCBlock;
-                /* break;   break unnecessary because it follows */
+                break;
             }
+
         case dstage_decodeCBlock:
-goto_decodeCBlock:
             {
+                int (*decoder)(const char*, char*, int, int, const char*, int);
                 int decodedSize;
+
                 if (dctxPtr->frameInfo.blockMode == blockLinked)
                     decoder = LZ4_decompress_safe_usingDict;
                 else
                     decoder = LZ4F_decompress_safe;
-                if ((size_t)(dstEnd-dstPtr) < dctxPtr->maxBlockSize)   /* not enough room : decode into tmpOut */
+
+                if ((size_t)(dstEnd-dstPtr) < dctxPtr->maxBlockSize)   /* not enough place into dst : decode into tmpOut */
                 {
-                    decodedSize = decoder((const char*)selectedIn, (char*)dctxPtr->tmpOut, (int)dctxPtr->sizeToDecode, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
+                    decodedSize = decoder((const char*)selectedIn, (char*)dctxPtr->tmpOut, (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                     if (decodedSize < 0) return -ERROR_GENERIC;   /* decompression failed */
-                    if (dctxPtr->frameInfo.contentChecksumFlag)
-                        XXH32_update(&(dctxPtr->xxh), dctxPtr->tmpOut, decodedSize);
-                    if (dctxPtr->frameInfo.blockMode==blockLinked)
-                        LZ4F_saveDict(dctxPtr, dctxPtr->tmpOut, decodedSize);
+                    if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), dctxPtr->tmpOut, decodedSize);
                     dctxPtr->tmpOutSize = decodedSize;
                     dctxPtr->tmpOutStart = 0;
                     dctxPtr->dStage = dstage_flushOut;
                     break;
                 }
-                decodedSize = decoder((const char*)selectedIn, (char*)dstPtr, (int)dctxPtr->sizeToDecode, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
+                decodedSize = decoder((const char*)selectedIn, (char*)dstPtr, (int)dctxPtr->tmpInTarget, (int)dctxPtr->maxBlockSize, (const char*)dctxPtr->dict, (int)dctxPtr->dictSize);
                 if (decodedSize < 0) return -ERROR_GENERIC;   /* decompression failed */
-                if (dctxPtr->frameInfo.contentChecksumFlag)
-                    XXH32_update(&(dctxPtr->xxh), dstPtr, decodedSize);
-                if (dctxPtr->frameInfo.blockMode==blockLinked)
-                    LZ4F_saveDict(dctxPtr, dstPtr, decodedSize);
+                if (dctxPtr->frameInfo.contentChecksumFlag) XXH32_update(&(dctxPtr->xxh), dstPtr, decodedSize);
+                if (dctxPtr->frameInfo.blockMode==blockLinked) LZ4F_pointDict(dctxPtr, dstPtr, decodedSize);
                 dstPtr += decodedSize;
                 dctxPtr->dStage = dstage_getCBlockSize;
                 break;
             }
-        case dstage_flushOut:
+
+        case dstage_flushOut:  /* flush decoded data from tmpOut to dstBuffer */
             {
                 size_t sizeToCopy = dctxPtr->tmpOutSize - dctxPtr->tmpOutStart;
                 if (sizeToCopy > (size_t)(dstEnd-dstPtr)) sizeToCopy = dstEnd-dstPtr;
                 memcpy(dstPtr, dctxPtr->tmpOut + dctxPtr->tmpOutStart, sizeToCopy);
                 dctxPtr->tmpOutStart += sizeToCopy;
                 dstPtr += sizeToCopy;
-                if (dctxPtr->tmpOutStart < dctxPtr->tmpOutSize) goto _end;   /* need to write more */
-                dctxPtr->dStage = dstage_getCBlockSize;
+                if (dctxPtr->tmpOutStart == dctxPtr->tmpOutSize)
+                {
+                    if (dctxPtr->frameInfo.blockMode==blockLinked) LZ4F_pointDict(dctxPtr, dctxPtr->tmpOut, dctxPtr->tmpOutSize);
+                    dctxPtr->dStage = dstage_getCBlockSize;
+                    break;
+                }
+                nextSrcSizeHint = 4;
+                doAnotherStage = 0;   /* still some data to flush */
                 break;
             }
+
         case dstage_getSuffix:
-goto_getSuffix:
             {
                 size_t suffixSize = dctxPtr->frameInfo.contentChecksumFlag * 4;
                 if (suffixSize == 0)   /* frame completed */
                 {
-                    goodResult = OK_FrameEnd;
+                    nextSrcSizeHint = 0;
                     dctxPtr->dStage = dstage_getHeader;
-                    goto _end;
+                    doAnotherStage = 0;
+                    break;
                 }
                 if ((srcEnd - srcPtr) >= 4)   /* CRC present */
                 {
                     selectedIn = srcPtr;
                     srcPtr += 4;
                     dctxPtr->dStage = dstage_checkSuffix;
-                    goto goto_checkSuffix;   /* break risks leaving the while loop */
+                    break;
                 }
                 dctxPtr->tmpInSize = 0;
                 dctxPtr->dStage = dstage_storeSuffix;
-                /* break;   useless, it follows */
+                break;
             }
+
         case dstage_storeSuffix:
             {
                 size_t sizeToCopy = 4 - dctxPtr->tmpInSize;
@@ -991,37 +1078,50 @@ goto_getSuffix:
                 memcpy(dctxPtr->tmpIn + dctxPtr->tmpInSize, srcPtr, sizeToCopy);
                 srcPtr += sizeToCopy;
                 dctxPtr->tmpInSize += sizeToCopy;
-                if (dctxPtr->tmpInSize < 4) break;   /* not enough input to read suffix */
+                if (dctxPtr->tmpInSize < 4)  /* not enough input to read complete suffix */
+                {
+                    nextSrcSizeHint = 4 - dctxPtr->tmpInSize;
+                    doAnotherStage=0;
+                    break;
+                }
                 selectedIn = dctxPtr->tmpIn;
                 dctxPtr->dStage = dstage_checkSuffix;
-                /* break;   useless, it follows; would need a goto anyway */
+                break;
             }
+
         case dstage_checkSuffix:
-goto_checkSuffix:
             {
                 U32 readCRC = LZ4F_readLE32(selectedIn);
                 U32 resultCRC = XXH32_intermediateDigest(&(dctxPtr->xxh));
                 if (readCRC != resultCRC) return -ERROR_checksum_invalid;
-                goodResult = OK_FrameEnd;
+                nextSrcSizeHint = 0;
                 dctxPtr->dStage = dstage_getHeader;
-                goto _end;
+                doAnotherStage = 0;
+                break;
             }
         }
     }
 
-    /* input fully read */
-
-_end:
+    if ( (dctxPtr->frameInfo.blockMode==blockLinked)
+       &&(dctxPtr->dict != dctxPtr->tmpOutBuffer)
+        )
+        LZ4F_saveDict(dctxPtr, NULL, 0);
+        //(!decompressOptionsPtr->stableDst + 1) )
+    /*{
+        size_t newDictSize = dctxPtr->dictSize;
+        BYTE* oldDictEnd = dctxPtr->dict + dctxPtr->dictSize;
+        if ((newDictSize) > 64 KB) newDictSize = 64 KB;
+        memcpy(dctxPtr->tmpOutBuffer, oldDictEnd - newDictSize, newDictSize);
+        dctxPtr->dict = dctxPtr->tmpOutBuffer;
+        dctxPtr->dictSize = newDictSize;
+        dctxPtr->tmpOut = dctxPtr->tmpOutBuffer + newDictSize;
+    }*/
 
     if (srcPtr<srcEnd)   /* function must be called again with following source data */
-    {
         dctxPtr->srcExpect = srcPtr;
-    }
     else
-    {
         dctxPtr->srcExpect = NULL;
-    }
-    *srcSize = (srcPtr - srcStart);
-    *dstSize = (dstPtr - dstStart);
-    return goodResult;
+    *srcSizePtr = (srcPtr - srcStart);
+    *dstSizePtr = (dstPtr - dstStart);
+    return nextSrcSizeHint;
 }

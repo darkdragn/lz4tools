@@ -1,28 +1,42 @@
-#!/usr/bin/python
+import hashlib
+import lz4file
+import os
+import shutil
+import sys
+import unittest
 
-import lz4f, struct, time
+class TestLZ4File(unittest.TestCase):
 
-def readNextBlock(fileObj, dCtx, blkId):
-    decompString = ''
-    blkSize = struct.unpack('<I', fileObj.read(4))[0]+4
-    fileObj.seek(fileObj.tell()-4)
-    compressedString = fileObj.read(blkSize)
-    decompString = lz4f.decompressFrame(compressedString, test, blkId)
-    return decompString
-def testDecomp(fileObj, dCtx, blkId):
-    start = f.tell()
-    decompString = readNextBlock(fileObj, dCtx, blkId)
-    end = f.tell()
-    decompLen = len(decompString)
-    print 'Block check, start: %i, end: %i, decompressedLen: %i' % (start,
-                                                                    end, decompLen)
+    #def test_random(self):
+    #  DATA = os.urandom(128 * 1024)  # Read 128kb
+    #  self.assertEqual(DATA, lz4.loads(lz4.dumps(DATA)))
+    
+    def test_file(self):
+      os.mkdir('testHold')
+      testNames = []
+      origDigest = hashlib.md5()
+      
+      with open('src/lz4.c', 'rb') as lz4Orig:
+        origDigest.update(lz4Orig.read())
+      
+      for num in range(1, 6):
+        testNames.append('testHold/test.%d.lz4' % num)
+      
+      lz4.compressFileAdv(fileName, 9, output=testNames[0])
+      lz4.compressFileAdv(fileName, 9, output=testNames[1], blockMode=0)
+      lz4.compressFileAdv(fileName, 9, output=testNames[2], blockSizeID=4)
+      lz4.compressFileAdv(fileName, 9, output=testNames[3], blockCheck=1)
+      lz4.compressFileAdv(fileName, 9, output=testNames[4], streamCheck=0)
+      
+      for test in testNames:
+        lz4.decompressFileDefault(test)
+        testDigest = hashlib.md5()
+        with open(test.replace('.lz4', ''), 'rb') as testFile:
+          testDigest.update(testFile.read())
+        self.assertEqual(origDigest.hexdigest(), testDigest.hexdigest())
+        del testDigest
+      shutil.rmtree('testHold')
+      
+if __name__ == '__main__':
+    unittest.main()
 
-test = lz4f.createDecompContext()
-f=open('../../../lz4file.tar.lz4')
-header = f.read(7)
-blkId = lz4f.getFrameInfo(header, test)
-testDecomp(f, test, blkId)
-testDecomp(f, test, blkId)
-testDecomp(f, test, blkId)
-f.seek(7)
-testDecomp(f, test, blkId)
