@@ -40,9 +40,9 @@ class Lz4File:
         if setCur:
             self.curBlk = [num for num, b in self.blkDict.iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
-        #if (self.fileObj.tell() + blkSize + 8) == self.compEnd:
-        #    #blkSize += 8
-        #    regen = True
+        if (self.fileObj.tell() + blkSize + 8) == self.compEnd:
+            blkSize += 8
+            regen = True
         compData = self.fileObj.read(blkSize)
         resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
         if 'regen' in locals(): self.regenDCTX()
@@ -113,10 +113,13 @@ class Lz4File:
         try:
             lz4f.freeDecompContext(self.dCtx)
             del self.dCtx
+            self.dCtx = lz4f.createDecompContext()
+            frameInfo = lz4f.getFrameInfo(self.header, self.dCtx)
+            lz4f.disableChecksum(self.dCtx)
         except AttributeError:
+            self.dCtx = lz4f.createDecompContext()
+            frameInfo = lz4f.getFrameInfo(self.header, self.dCtx)
             pass
-        self.dCtx = lz4f.createDecompContext()
-        frameInfo = lz4f.getFrameInfo(self.header, self.dCtx)
         del frameInfo
     @property
     def decompPos(self):
