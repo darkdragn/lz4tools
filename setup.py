@@ -15,7 +15,6 @@ setup(
     author_email='darkdragn.cj@gmail.com',
     url='https://github.com/darkdragn/python-lz4',
     packages=find_packages(),
-    #package_data={'': 'lz4file.py'},
     py_modules=['lz4file'],
     ext_modules=[
         Extension('lz4f', [
@@ -33,8 +32,8 @@ setup(
             "-DVERSION=\"%s\"" % VERSION_STR,
             "-DLZ4_VERSION=\"r122\"",
         ])],
-    #setup_requires=["nose>=1.0"],
-    #test_suite = "nose.collector",
+    setup_requires=["nose>=1.0"],
+    test_suite = "nose.collector",
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
