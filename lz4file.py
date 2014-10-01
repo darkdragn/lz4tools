@@ -148,6 +148,27 @@ class Lz4Tar(tarfile.TarFile):
     tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
 
 # Generic lz4file methods
+def compressFileDefault(name, overwrite=None):
+    outname = '.'.join([name, 'lz4'])
+    if os.path.exists(outname):
+        print 'File Exists!'
+        pass
+    with __builtin__.open(outname, 'w') as out:
+        with __builtin__.open(name) as infile:
+            out.write(lz4f.compressFrame(infile.read()))
+        out.flush()
+        out.close()
+def compressTarDefault(dirName, overwrite=None):
+    import StringIO
+    buff = StringIO.StringIO()
+    tarbuff = tarfile.open(fileobj=buff, mode='w|')
+    tarbuff.add(dirName)
+    tarbuff.close()
+    buff.seek(0)
+    with __builtin__.open('.'.join([dirName, 'lz4']), 'w') as out:
+        out.write(lz4f.compressFrame(buff.read()))
+        out.flush()
+        out.close()
 def get_block_size(fileObj):
     size = struct.unpack('<I', fileObj.read(4))[0]
     fileObj.seek(fileObj.tell()-4)
