@@ -2,6 +2,7 @@
 
 import __builtin__
 import lz4f
+import os
 import struct
 import sys
 import tarfile
