@@ -1,6 +1,8 @@
+==================
 LZ4tools and LZ4f
-================
+==================
 
+.. image:: https://api.travis-ci.org/darkdragn/lz4file.png?branch=modular
 
 Overview
 --------
@@ -8,13 +10,13 @@ This package consists of two parts:
 
 1. lz4f - bindings for all lz4frame functions
 
-2. lz4tools - a zipfile-like file wrapper and tarfile-like class for lz4 compressed files. 
+2. lz4tools - a zipfile-like file wrapper class and tarfile-like class for lz4 compressed files. 
 
 Usage
 -----
 I would recommend against using lz4f directly except in debug/testing situations. If necessary, a compress or decompress operation first needs a context that will be used with all lz4f functions:
 
-    lz4f compression the hard way:
+lz4f compression the hard way:
     >>> import lz4f
     >>> inputFile = open('fileIn')
     >>> cCtx = lz4f.createCompressionContext
@@ -28,7 +30,7 @@ I would recommend against using lz4f directly except in debug/testing situations
     ...     out.flush()
     ...     out.close()
     
-    lz4f compression the easy way:
+lz4f compression the easy way:
     >>> import lz4f
     >>> with open('output.lz4') as out:
     ...     with open('fileIn') as inFile:
@@ -40,7 +42,7 @@ Advantages and disadvntages: The easy way takes more ram. It reads the contents 
 
 The lz4file module is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some document strings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
 
-    lz4file tar example:
+lz4file tar example::
     >>> import lz4tools
     >>> lz4tools.compressTarDefault('src')
     >>> testTar = lz4tools.openTar('src.lz4')
@@ -57,7 +59,7 @@ The lz4file module is currently read only. Right now it is a bit rough around th
     -rw-r--r-- darkdragn/darkdragn      14882 2014-09-18 01:28:06 src/lz4.h
     -rw-rw-r-- darkdragn/darkdragn      50141 2014-10-02 23:04:05 src/lz4frame.c
     
-    lz4file file example:
+lz4file file example::
     >>> import lz4tools
     >>> lz4tools.compressFileDefault('setup.py')
     >>> testFile = lz4tools.open('setup.py.lz4')

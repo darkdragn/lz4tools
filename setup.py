@@ -10,7 +10,7 @@ setup(
     name='lz4tools',
     version=VERSION_STR,
     description="LZ4F Bindings for Python",
-    long_description=open('README.md', 'r').read(),
+    long_description=open('README.rst', 'r').read(),
     author='Christopher Jackson',
     author_email='darkdragn.cj@gmail.com',
     url='https://github.com/darkdragn/lz4file',
