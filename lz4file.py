@@ -33,6 +33,14 @@ class Lz4File:
             fileObj = __builtin__.open(name)
         return cls(name, fileObj, seekable)
     def read_block(self, blkSize = None, blk = None, setCur = True):
+        """
+        :type int:  blkSize - returned from get_block_size()
+        :type dict: blk     - entry from blkDict
+        :type bool: setCur  - update current blk var
+
+        Reads the next block, unless provided a blk from blkDict. If provided
+        a blk, it will read that specific block.
+        """
         if blk:
             self.fileObj.seek(blk.get('compressed_begin'))
             blkSize = blk.get('blkSize')
@@ -46,9 +54,13 @@ class Lz4File:
             regen = True
         compData = self.fileObj.read(blkSize)
         resultDict = lz4f.decompressFrame(compData, self.dCtx, self.blkSizeID)
-        if 'regen' in locals(): self.regenDCTX()
+        if 'regen' in locals(): self._regenDCTX()
         return resultDict.get('decomp')
     def load_blocks(self):
+        """
+        Generates the blkDict, making the file seekable. Only one block will
+        be decoded at a time, minimizing memory usage.
+        """
         self.blkDict = {}
         total, blkNum, pos = 0, 0, 7
         blkSize = get_block_size(self.fileObj)
@@ -69,6 +81,11 @@ class Lz4File:
         self.decomp = self.read_block(blk=self.blkDict.get(0))
         self.seek(0)
     def read(self, size = None):
+        """
+        :type int: size
+        File read-like function. If passed a size, it only reads those bytes.
+        If not passed a size, it reads the entire file, from the current position.
+        """
         if not size:
             size = self.end-self.pos
         out = str()
@@ -89,6 +106,10 @@ class Lz4File:
             return out
         return out
     def decompress(self, outName):
+        """
+        :type string: outName
+        Generic decompress function. Will decompress the entire file to outName.
+        """
         writeOut = __builtin__.open(outName, 'wb')
         for blk in self.blkDict.values():
             out = self.read_block(blk=blk)
@@ -96,6 +117,11 @@ class Lz4File:
             writeOut.flush()
         writeOut.close()
     def seek(self, offset, whence=0):
+        """
+        :type int: offset
+        File seek-like function. Accepts offset. Whence for future improvement,
+        but not yet implemented.
+        """
         thisBlk = int()
         if not offset:
             blk = self.blkDict.get(0)
@@ -109,8 +135,14 @@ class Lz4File:
             self.decomp =  self.read_block(blk = blk, setCur=False)
             self.pos = offset
     def tell(self):
+        """
+        Returns the current position in the 'decompressed' data.
+        """
         return self.pos
-    def regenDCTX(self):
+    def _regenDCTX(self):
+        """
+        Regenerate the decompression context.
+        """
         try:
             lz4f.freeDecompContext(self.dCtx)
             del self.dCtx
@@ -148,8 +180,18 @@ class Lz4Tar(tarfile.TarFile):
         return cls(None, mode, lz4FileOut)
     tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
 
-# Generic lz4file methods
+### Generic lz4file methods ###
 def compressFileDefault(name, overwrite=None):
+    """
+    :type string: name      - name of file to compress
+    :type bool:   overwrite - overwrite destination
+    Generic compress method for a file. Adds .lz4 to original file name for
+    output.
+
+    ***WARNING*** Currently uses lz4f.compressFrame, which will read the entire
+    original file into memory, then pass to c-module for compression. Avoid
+    using this for large files until migrated to advCompress functions.
+    """
     outname = '.'.join([name, 'lz4'])
     if os.path.exists(outname):
         print 'File Exists!'
@@ -160,17 +202,29 @@ def compressFileDefault(name, overwrite=None):
         out.flush()
         out.close()
 def compressTarDefault(dirName, overwrite=None):
+    """
+    :type string: dirName   - the name of the dir to tar
+    :type bool:   overwrite - overwrite destination
+    Generic compress method for creating .tar.lz4 from a dir.
+
+    ***WARNING*** Currently uses StringIO object until lz4file supports write.
+    Avoid using for large directories, it will consume quite a bit of RAM.
+    """
     import StringIO
     buff = StringIO.StringIO()
     tarbuff = tarfile.open(fileobj=buff, mode='w|')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
-    with __builtin__.open('.'.join([dirName, 'lz4']), 'w') as out:
+    with __builtin__.open('.'.join([dirName, 'tar', 'lz4']), 'w') as out:
         out.write(lz4f.compressFrame(buff.read()))
         out.flush()
         out.close()
 def get_block_size(fileObj):
+    """
+    :type file: fileObj - At least seeked to 7 (past header)
+    Static method to determine next block's blockSize.
+    """
     size = struct.unpack('<I', fileObj.read(4))[0]
     fileObj.seek(fileObj.tell()-4)
     returnSize = (size & 0x7FFFFFFF)
@@ -178,10 +232,16 @@ def get_block_size(fileObj):
         return 0
     return returnSize+4
 def open(name=None, fileObj=None):
+    """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)
 def openTar(name=None, fileObj=None):
+    """  Alias for Lz4Tar.open()     """
     return Lz4Tar.lz4open(name, 'r', fileObj)
 def tell_end(fileObj):
+    """
+    :type file: fileObj
+    Determine the end of the compressed file.
+    """
     pos = fileObj.tell()
     fileObj.seek(0, 2)
     end = fileObj.tell()
