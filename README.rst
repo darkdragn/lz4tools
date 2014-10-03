@@ -45,7 +45,7 @@ The lz4file module is currently read only. Right now it is a bit rough around th
 lz4file tar example:
     >>> import lz4tools
     >>> lz4tools.compressTarDefault('src')
-    >>> testTar = lz4tools.openTar('src.lz4')
+    >>> testTar = lz4tools.openTar('src.tar.lz4')
     >>> testTar.list()
     -rwxr-xr-x darkdragn/darkdragn          0 2014-10-02 23:06:09 src/
     -rw-r--r-- darkdragn/darkdragn      29905 2014-09-16 18:29:45 src/lz4hc.c
