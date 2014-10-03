@@ -42,7 +42,7 @@ Advantages and disadvntages: The easy way takes more ram. It reads the contents 
 
 The lz4file module is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some document strings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
 
-lz4file tar example::
+lz4file tar example:
     >>> import lz4tools
     >>> lz4tools.compressTarDefault('src')
     >>> testTar = lz4tools.openTar('src.lz4')
@@ -59,7 +59,7 @@ lz4file tar example::
     -rw-r--r-- darkdragn/darkdragn      14882 2014-09-18 01:28:06 src/lz4.h
     -rw-rw-r-- darkdragn/darkdragn      50141 2014-10-02 23:04:05 src/lz4frame.c
     
-lz4file file example::
+lz4file file example:
     >>> import lz4tools
     >>> lz4tools.compressFileDefault('setup.py')
     >>> testFile = lz4tools.open('setup.py.lz4')
@@ -81,6 +81,5 @@ lz4file file example::
             end = fileObj.tell()
             fileObj.seek(pos)
             return end
+
 And thus ends the brief tutoral.
-
-
