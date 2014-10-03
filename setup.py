@@ -7,15 +7,17 @@ VERSION = (1, 2, 0)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 
 setup(
-    name='lz4f',
+    name='lz4tools',
     version=VERSION_STR,
-    description="LZ4F Bindings for Python",
-    #long_description=open('README.rst', 'r').read(),
+    description="LZ4Frame Bindings and tools for Python",
+    license = 'BSD',
+    long_description=open('README.rst', 'r').read(),
     author='Christopher Jackson',
     author_email='darkdragn.cj@gmail.com',
-    url='https://github.com/darkdragn/python-lz4',
-    packages=find_packages(),
-    py_modules=['lz4file'],
+    url='https://github.com/darkdragn/lz4file',
+    packages=['lz4tools'],
+    #package_dir={'': ''},
+    #py_modules=['lz4tools'],
     ext_modules=[
         Extension('lz4f', [
             'src/lz4.c',
@@ -34,6 +36,7 @@ setup(
         ])],
     setup_requires=["nose>=1.0"],
     test_suite = "nose.collector",
+    keywords = ['lz4', 'lz4frame', 'lz4file', 'lz4tar'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
@@ -42,6 +45,5 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.3',
     ],
 )
