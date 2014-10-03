@@ -1,9 +1,10 @@
 import __builtin__
 import lz4f
 import os
-import tarfile
 from lz4file import Lz4File
 from lz4tar import Lz4Tar
+
+__all__ = ['lz4file', 'lz4tar']
 
 def compressFileDefault(name, overwrite=None):
     """
@@ -36,7 +37,7 @@ def compressTarDefault(dirName, overwrite=None):
     """
     import StringIO
     buff = StringIO.StringIO()
-    tarbuff = tarfile.open(fileobj=buff, mode='w|')
+    tarbuff = Lz4Tar.open(fileobj=buff, mode='w|')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
