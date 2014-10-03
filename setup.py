@@ -7,15 +7,16 @@ VERSION = (1, 2, 0)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 
 setup(
-    name='lz4f',
+    name='lz4tools',
     version=VERSION_STR,
     description="LZ4F Bindings for Python",
-    #long_description=open('README.rst', 'r').read(),
+    long_description=open('README.md', 'r').read(),
     author='Christopher Jackson',
     author_email='darkdragn.cj@gmail.com',
-    url='https://github.com/darkdragn/python-lz4',
-    packages=find_packages(),
-    py_modules=['lz4file'],
+    url='https://github.com/darkdragn/lz4file',
+    packages=['lz4tools'],
+    #package_dir={'': ''},
+    #py_modules=['lz4tools'],
     ext_modules=[
         Extension('lz4f', [
             'src/lz4.c',
