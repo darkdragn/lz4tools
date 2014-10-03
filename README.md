@@ -1,4 +1,4 @@
-LZ4file and LZ4f
+LZ4tools and LZ4f
 ================
 
 
@@ -8,7 +8,7 @@ This package consists of two parts:
 
 1. lz4f - bindings for all lz4frame functions
 
-2. lz4file - a zipfile-like file wrapper for lz4 compressed files. 
+2. lz4tools - a zipfile-like file wrapper and tarfile-like class for lz4 compressed files. 
 
 Usage
 -----
@@ -41,9 +41,9 @@ Advantages and disadvntages: The easy way takes more ram. It reads the contents 
 The lz4file module is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some document strings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
 
     lz4file tar example:
-    >>> import lz4file
-    >>> lz4file.compressTarDefault('src')
-    >>> testTar = lz4file.openTar('src.lz4')
+    >>> import lz4tools
+    >>> lz4tools.compressTarDefault('src')
+    >>> testTar = lz4tools.openTar('src.lz4')
     >>> testTar.list()
     -rwxr-xr-x darkdragn/darkdragn          0 2014-10-02 23:06:09 src/
     -rw-r--r-- darkdragn/darkdragn      29905 2014-09-16 18:29:45 src/lz4hc.c
@@ -58,9 +58,9 @@ The lz4file module is currently read only. Right now it is a bit rough around th
     -rw-rw-r-- darkdragn/darkdragn      50141 2014-10-02 23:04:05 src/lz4frame.c
     
     lz4file file example:
-    >>> import lz4file
-    >>> lz4file.compressFileDefault('lz4file.py')
-    >>> testFile = lz4file.open('lz4file.py.lz4')
+    >>> import lz4tools
+    >>> lz4tools.compressFileDefault('setup.py')
+    >>> testFile = lz4tools.open('setup.py.lz4')
     >>> print testFile.blkDict
         {0: {'decomp_e': 6584, 'compressed_begin': 7, 'blkSize': 3109}}
     >>> testFile.end
