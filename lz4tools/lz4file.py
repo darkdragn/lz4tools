@@ -1,11 +1,16 @@
 #!/usr/bin/python
 
-import __builtin__
 import lz4f
 import os
 import struct
 import sys
 import tarfile
+
+if sys.version_info.major >= 3:
+    import builtins as __builtin__
+else:
+    import __builtin__
+
 
 class Lz4File:
     def __init__(self, name, fileObj=None, seekable=True):
@@ -23,15 +28,17 @@ class Lz4File:
             try:
                 self.load_blocks()
             except:
-                print 'Unable to load blockDict. Possibly not a lz4 file.'
+                print('Unable to load blockDict. Possibly not a lz4 file.')
                 raise
     @classmethod
     def open(cls, name = None, fileObj = None, seekable=True):
         if not name and not fileObj:
             sys.stderr.write('Nothing to open!')
         if not fileObj:
-            fileObj = __builtin__.open(name)
+            fileObj = __builtin__.open(name, 'rb')
         return cls(name, fileObj, seekable)
+    def close(self):
+        self.fileObj.close()
     def decompress(self, outName):
         """
         :type string: outName
@@ -86,7 +93,7 @@ class Lz4File:
         """
         if not size:
             size = self.end-self.pos
-        out = str()
+        out = bytes()
         decompOld = self.decompPos
         if self.pos+size > self.end:
             size = self.end-self.pos
@@ -118,7 +125,11 @@ class Lz4File:
         if not blkSize: blkSize = self.get_block_size()
         if blkSize == 0: return ''
         if setCur:
-            self.curBlk = [num for num, b in self.blkDict.iteritems()
+            try:
+                iteritems = self.blkDict.iteritems
+            except AttributeError:
+                iteritems = self.blkDict.items
+            self.curBlk = [num for num, b in iteritems()
                            if self.fileObj.tell() == b.get('compressed_begin')][0]
         if (self.fileObj.tell() + blkSize + 8) == self.compEnd:
             blkSize += 8
@@ -137,7 +148,11 @@ class Lz4File:
         if not offset:
             blk = self.blkDict.get(0)
         else:
-            thisBlk, blk = [[num, b] for num, b in self.blkDict.iteritems()
+            try:
+                iteritems = self.blkDict.iteritems
+            except AttributeError:
+                iteritems = self.blkDict.items
+            thisBlk, blk = [[num, b] for num, b in iteritems()
                    if offset < b.get('decomp_e')][0]
         if self.curBlk == thisBlk:
             self.pos = offset
@@ -181,7 +196,7 @@ class Lz4File:
     @property
     def curBlkData(self):
         return self.blkDict.get(self.curBlk)
-    @property
+    #@property
     def seekable(self):
         if self.blkDict:
             return True

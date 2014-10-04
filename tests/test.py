@@ -15,6 +15,8 @@ class TestLZ4File(unittest.TestCase):
             dircount = 1
             dircount += len(dirs)
             dircount += len(files)
+        testTar.fileobj.close()
+        testTar.close()
         self.assertEqual(dircount, len(count))
         os.remove('src.tar.lz4')
 

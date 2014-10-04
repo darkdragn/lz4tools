@@ -1,13 +1,19 @@
-import __builtin__
+import sys
 import tarfile
-from lz4file import Lz4File
+if sys.version_info.major >= 3:
+    import builtins as __builtin__
+    from .lz4file import Lz4File
+else:
+    import __builtin__
+    from lz4file import Lz4File
+
 class Lz4Tar(tarfile.TarFile):
     @classmethod
     def lz4open(cls, name=None, mode='r', fileobj=None):
         if name and not fileobj:
-            fileobj=__builtin__.open(name)
+            fileobj=__builtin__.open(name, 'rb')
         elif not name and not fileobj:
-            print 'Unable to open without a name or fileobj'
+            print('Unable to open without a name or fileobj')
             return
         if not name and hasattr(fileobj.name):
             name = fileobj.name

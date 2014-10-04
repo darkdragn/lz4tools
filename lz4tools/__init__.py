@@ -1,8 +1,18 @@
-import __builtin__
 import lz4f
 import os
-from lz4file import Lz4File
-from lz4tar import Lz4Tar
+import sys
+
+if sys.version_info.major >= 3:
+    import builtins as __builtin__
+    from .lz4file import Lz4File
+    from .lz4tar import Lz4Tar
+    from io import BytesIO as StringIO
+else:
+    import __builtin__
+    from lz4file import Lz4File
+    from lz4tar import Lz4Tar
+    from StringIO import StringIO
+
 
 __all__ = ['lz4file', 'lz4tar']
 
@@ -19,7 +29,7 @@ def compressFileDefault(name, overwrite=None):
     """
     outname = '.'.join([name, 'lz4'])
     if os.path.exists(outname):
-        print 'File Exists!'
+        print('File Exists!')
         pass
     with __builtin__.open(outname, 'w') as out:
         with __builtin__.open(name) as infile:
@@ -35,13 +45,12 @@ def compressTarDefault(dirName, overwrite=None):
     ***WARNING*** Currently uses StringIO object until lz4file supports write.
     Avoid using for large directories, it will consume quite a bit of RAM.
     """
-    import StringIO
-    buff = StringIO.StringIO()
+    buff = StringIO()
     tarbuff = Lz4Tar.open(fileobj=buff, mode='w|')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
-    with __builtin__.open('.'.join([dirName, 'tar', 'lz4']), 'w') as out:
+    with __builtin__.open('.'.join([dirName, 'tar', 'lz4']), 'wb') as out:
         out.write(lz4f.compressFrame(buff.read()))
         out.flush()
         out.close()
