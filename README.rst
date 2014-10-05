@@ -2,7 +2,7 @@
 LZ4tools and LZ4f
 ==================
 
-.. image:: https://api.travis-ci.org/darkdragn/lz4file.png?branch=modular
+.. image:: https://travis-ci.org/darkdragn/lz4file.svg?branch=master
 
 Overview
 --------

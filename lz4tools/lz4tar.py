@@ -18,5 +18,10 @@ class Lz4Tar(tarfile.TarFile):
         if not name and hasattr(fileobj.name):
             name = fileobj.name
         lz4FileOut = Lz4File.open(fileObj=fileobj)
-        return cls(None, mode, lz4FileOut)
+        try:
+            t = cls(None, mode, lz4FileOut)
+        except:
+            lz4FileOut.close()
+        t._extfileobj = False
+        return t
     tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})

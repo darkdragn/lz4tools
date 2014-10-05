@@ -54,6 +54,8 @@ def compressTarDefault(dirName, overwrite=None):
         out.write(lz4f.compressFrame(buff.read()))
         out.flush()
         out.close()
+    buff.close()
+    del tarbuff, buff
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)
