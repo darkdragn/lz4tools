@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, Extension
 
 VERSION = (1, 2, 1, 1)
 VERSION_STR = ".".join([str(x) for x in VERSION])
@@ -16,8 +16,6 @@ setup(
     author_email='darkdragn.cj@gmail.com',
     url='https://github.com/darkdragn/lz4file',
     packages=['lz4tools'],
-    #package_dir={'': ''},
-    #py_modules=['lz4tools'],
     ext_modules=[
         Extension('lz4f', [
             'src/lz4.c',
