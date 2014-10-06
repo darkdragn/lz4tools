@@ -12,8 +12,8 @@ class TestLZ4File(unittest.TestCase):
         testTar = lz4tools.openTar('src.tar.lz4')
         count = testTar.getmembers()
         testTar.close()
+        dircount = 1
         for root, dirs, files in os.walk('src'):
-            dircount = 1
             dircount += len(dirs)
             dircount += len(files)
         self.assertEqual(dircount, len(count))
