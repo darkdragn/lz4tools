@@ -84,3 +84,9 @@ lz4tools file example:
     )
 
 And thus ends the brief tutoral.
+
+Notes
+-----
+
+Version : 
+    The first two digits of the version will always correspond with the                                                                   version of lz4 that is included. Current version is r123, thus 1.2. The next  digit is correspond to milestone improvements. Example: Once lz4file supports write. The last digit will be slight improvements. Usually some contextual error, or syntax error. Perhaps even a quick fix for python3.4, since I don't use it often, if an issue is brought to my attention, I will provide a quick fix as quickly as possible. 
