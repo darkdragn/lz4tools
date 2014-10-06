@@ -3,7 +3,7 @@
 
 from setuptools import setup, Extension
 
-VERSION = (1, 2, 1, 1)
+VERSION = (1, 2, 1, 2)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 
 setup(
@@ -16,6 +16,7 @@ setup(
     author_email='darkdragn.cj@gmail.com',
     url='https://github.com/darkdragn/lz4file',
     packages=['lz4tools'],
+    scripts=['lz4toolsCli'],
     ext_modules=[
         Extension('lz4f', [
             'src/lz4.c',

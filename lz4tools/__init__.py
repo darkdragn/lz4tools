@@ -24,7 +24,7 @@ def compressFileDefault(name, overwrite=False, outname=None):
                               Default will be '.'.join([name, 'lz4'])
     Generic compress method for a file. Adds .lz4 to original file name for
     output, unless outname is provided.
-    
+
     ***NOTE*** No longer uses compressFrame. This is now large file safe!
     It will now read the input in 64Kb chunks.
     """
@@ -34,6 +34,9 @@ def compressFileDefault(name, overwrite=False, outname=None):
         print('File Exists!')
         if not overwrite:
             return
+    if not os.path.exists(name):
+        print('Unable to locate the original file. Please check filename.')
+        return
     cCtx = lz4f.createCompContext()
     header = lz4f.compressBegin(cCtx)
     with __builtin__.open(outname, 'wb') as out:
@@ -49,7 +52,7 @@ def compressFileDefault(name, overwrite=False, outname=None):
         out.flush()
         out.close()
     lz4f.freeCompContext(cCtx)
-def compressTarDefault(dirName, overwrite=None):
+def compressTarDefault(dirName, overwrite=None, outname=None):
     """
     :type string: dirName   - the name of the dir to tar
     :type bool:   overwrite - overwrite destination
@@ -58,12 +61,17 @@ def compressTarDefault(dirName, overwrite=None):
     ***WARNING*** Currently uses StringIO object until lz4file supports write.
     Avoid using for large directories, it will consume quite a bit of RAM.
     """
+    if not outname:
+        outname = '.'.join([dirName.rstrip('/'), 'tar', 'lz4'])
+    if not os.path.exists(dirName):
+        print('Unable to locate the directory to compress.')
+        return
     buff = StringIO()
     tarbuff = Lz4Tar.open(fileobj=buff, mode='w|')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
-    with __builtin__.open('.'.join([dirName, 'tar', 'lz4']), 'wb') as out:
+    with __builtin__.open(outname, 'wb') as out:
         out.write(lz4f.compressFrame(buff.read()))
         out.flush()
         out.close()
@@ -85,7 +93,7 @@ def decompressFileDefault(name, overwrite=False, outname=None):
     if not outname:
         outname = name.strip('.lz4')
         if outname == name:
-            print(''.join(['File does not contain .lz4 extension.',
+            print(''.join(['File does not contain .lz4 extension. ',
                            'Please provide outname.']))
             return
         if os.path.exists(outname) and not overwrite:

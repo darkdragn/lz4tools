@@ -5,6 +5,6 @@ dist/
 *egg-info/
 *.so
 *.pyc
-
+*__pycache__/
 # Edit objects
 *.swp
