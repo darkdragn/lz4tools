@@ -16,26 +16,39 @@ else:
 
 __all__ = ['lz4file', 'lz4tar']
 
-def compressFileDefault(name, overwrite=None):
+def compressFileDefault(name, overwrite=False, outname=None):
     """
     :type string: name      - name of file to compress
     :type bool:   overwrite - overwrite destination
+    :type string: outname   - name for compressed file, not required.
+                              Default will be '.'.join([name, 'lz4'])
     Generic compress method for a file. Adds .lz4 to original file name for
-    output.
-
-    ***WARNING*** Currently uses lz4f.compressFrame, which will read the entire
-    original file into memory, then pass to c-module for compression. Avoid
-    using this for large files until migrated to advCompress functions.
+    output, unless outname is provided.
+    
+    ***NOTE*** No longer uses compressFrame. This is now large file safe!
+    It will now read the input in 64Kb chunks.
     """
-    outname = '.'.join([name, 'lz4'])
+    if not outname:
+        outname = '.'.join([name, 'lz4'])
     if os.path.exists(outname):
         print('File Exists!')
-        pass
-    with __builtin__.open(outname, 'w') as out:
-        with __builtin__.open(name) as infile:
-            out.write(lz4f.compressFrame(infile.read()))
+        if not overwrite:
+            return
+    cCtx = lz4f.createCompContext()
+    header = lz4f.compressBegin(cCtx)
+    with __builtin__.open(outname, 'wb') as out:
+        out.write(header)
+        with __builtin__.open(name, 'rb') as infile:
+            while True:
+                decompData = infile.read((64*(1<<10)))
+                if not decompData:
+                    break
+                compData = lz4f.compressUpdate(decompData, cCtx)
+                out.write(compData)
+            out.write(lz4f.compressEnd(cCtx))
         out.flush()
         out.close()
+    lz4f.freeCompContext(cCtx)
 def compressTarDefault(dirName, overwrite=None):
     """
     :type string: dirName   - the name of the dir to tar
@@ -56,6 +69,30 @@ def compressTarDefault(dirName, overwrite=None):
         out.close()
     buff.close()
     del tarbuff, buff
+def decompressFileDefault(name, overwrite=False, outname=None):
+    """
+    :type string: name      - name of file to decompress
+    :type bool:   overwrite - overwrite destination
+    :type string: outname   - name for decompressed file, not required.
+                              Default will be '.'.join([name, 'lz4'])
+    Generic decompress method for a file. Removes .lz4 to original file name for
+    output, unless outname is provided.
+
+    ***WARNING*** Currently uses lz4f.compressFrame, which will read the entire
+    original file into memory, then pass to c-module for compression. Avoid
+    using this for large files until migrated to advCompress functions.
+    """
+    if not outname:
+        outname = name.strip('.lz4')
+        if outname == name:
+            print(''.join(['File does not contain .lz4 extension.',
+                           'Please provide outname.']))
+            return
+        if os.path.exists(outname) and not overwrite:
+            print(''.join(['Output file exists! Please authorize overwrite or',
+                           ' specify a different outfile name.']))
+    infile = Lz4File.open(name)
+    infile.decompress(outname)
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)

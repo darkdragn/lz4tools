@@ -18,27 +18,30 @@ I would recommend against using lz4f directly except in debug/testing situations
 
 lz4f compression the hard way:
     >>> import lz4f
-    >>> inputFile = open('fileIn')
+    >>> inputFile = open('fileIn', 'rb')
     >>> cCtx = lz4f.createCompressionContext
     >>> header = lz4f.compressBegin(cCtx)
     >>> data = lz4f.compressUpdate(inputFile.read(), cCtx)
     >>> end = lz4f.compressEnd(cCtx)
-    >>> with open('output.lz4', 'w') as out:
+    >>> with open('output.lz4', 'wb') as out:
     ...     out.write(header)
     ...     out.write(data)
     ...     out.write(end)
     ...     out.flush()
     ...     out.close()
+    >>> lz4f.freeCompContext(cCtx)
+    >>> inputFile.close()
+    >>> del header, data, end
     
 lz4f compression the easy way:
     >>> import lz4f
-    >>> with open('output.lz4') as out:
-    ...     with open('fileIn') as inFile:
+    >>> with open('output.lz4', 'wb') as out:
+    ...     with open('fileIn', 'rb') as inFile:
     ...         out.write(lz4f.compressFrame(inFile.read())
     ...     out.flush()
     ...     out.close()
     
-Advantages and disadvntages: The easy way takes more ram. It reads the contents of the file into a buffer, passes it and compresses it all in one go. With the hard way you can have it read as little or as much as you like. For instance, you can break up the input into 64k chunks. Each chunk could be read, compressed and dropped to disk to conserve ram.
+Advantages and disadvantages: The easy way takes more ram. It reads the contents of the file into a buffer, passes it and compresses it all in one go. With the hard way you can have it read as little or as much as you like. For instance, you can break up the input into 64k chunks. Each chunk could be read, compressed and dropped to disk to conserve ram.
 
 The lz4file class is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some document strings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
 
