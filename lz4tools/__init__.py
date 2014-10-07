@@ -16,7 +16,7 @@ else:
 
 __all__ = ['lz4file', 'lz4tar']
 
-def compressFileDefault(name, overwrite=False, outname=None):
+def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
     """
     :type string: name      - name of file to compress
     :type bool:   overwrite - overwrite destination
@@ -38,7 +38,7 @@ def compressFileDefault(name, overwrite=False, outname=None):
         print('Unable to locate the original file. Please check filename.')
         return
     cCtx = lz4f.createCompContext()
-    header = lz4f.compressBegin(cCtx, None)
+    header = lz4f.compressBegin(cCtx, prefs)
     with __builtin__.open(outname, 'wb') as out:
         out.write(header)
         with __builtin__.open(name, 'rb') as infile:
