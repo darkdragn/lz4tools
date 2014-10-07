@@ -24,18 +24,24 @@ Cli:
 ::
 
     $lz4toolsCli
-    usage: lz4toolsCli [-h] [-f] [-t] [-d] input [output]
-    
+    usage: lz4toolsCli [-h] [-f] [-t] [-d] [-bs {4,5,6,7}] [-bm {0,1}]
+           input [output]
+
     positional arguments:
-      input       The targeted input.
-      output      Optional output target.
+      input          The targeted input.
+      output         Optional output target.
     
     optional arguments:
-      -h, --help  show this help message and exit
-      -f          Compress file. Default action if input is a file.
-      -t          Compress directory to .tar.lz4. Default action if input is a
-                  directory
-      -d          Decompress. Default action if the file ends in .lz4.
+      -h, --help     show this help message and exit
+      -f             Compress file. Default action if input is a file.
+      -t             Compress directory to .tar.lz4. Default action if input is a
+                     directory
+      -d             Decompress. Default action if the file ends in .lz4.
+      -bs {4,5,6,7}  Specify blkSizeId. Valid values are 4-7. Default value is 7.
+      -bm {0,1}      Specify blkMode. 0 = Chained blocks. 1 = Independent blocks
+                     Default value is 0.
+
+
 
 C-Module / Bindings:
     I would recommend against using lz4f directly except in debug/testing situations. If necessary, a compress or decompress operation first needs a context that will be used with all lz4f functions:
