@@ -3,7 +3,7 @@
 
 from setuptools import setup, Extension
 
-VERSION = (1, 2, 1, 2)
+VERSION = (1, 2, 1, 3)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 
 setup(
@@ -31,7 +31,7 @@ setup(
             "-W",
             "-Wundef",
             "-DVERSION=\"%s\"" % VERSION_STR,
-            "-DLZ4_VERSION=\"r123\"",
+            "-DLZ4_VERSION=\"r124\"",
         ])],
     setup_requires=["nose>=1.0"],
     test_suite = "nose.collector",
