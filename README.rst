@@ -1,8 +1,8 @@
 ==================
-LZ4tools and LZ4f
+Lz4tools and Lz4f
 ==================
 
-.. image:: https://travis-ci.org/darkdragn/lz4file.svg?branch=modular
+.. image:: https://travis-ci.org/darkdragn/lz4tools.svg?branch=modular
 
 Overview
 --------
@@ -11,6 +11,10 @@ This package consists of two parts:
 1. lz4f - C-Module containing python bindings for all lz4frame functions.
 2. lz4tools - a zipfile-like file wrapper class and tarfile-like class for lz4 compressed files. 
 3. lz4toolsCli - a quick cli for using lz4tools static functions.
+
+Before going any further, I recommend reading up on lz4 at: https://code.google.com/p/lz4/
+
+It is an awesome compression algorithm and I can't than Yann Collet enough for putting together the C implementation and lz4frame.
 
 Usage
 -----
