@@ -91,6 +91,10 @@ class Lz4File:
         File read-like function. If passed a size, it only reads those bytes.
         If not passed a size, it reads the entire file, from the current position.
         """
+        if size == 0:
+            return ''
+        if self.pos == self.end:
+            raise EOFError, "Reached EOF"
         if not size:
             size = self.end-self.pos
         out = bytes()
