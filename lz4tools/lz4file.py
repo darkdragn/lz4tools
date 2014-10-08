@@ -20,16 +20,19 @@ class Lz4File:
             self.compEnd = self.tell_end()
         else:
             return open(name)
-        self.dCtx = lz4f.createDecompContext()
         self.header = fileObj.read(7)
-        self.fileInfo = lz4f.getFrameInfo(self.header, self.dCtx)
-        self.blkSizeID = self.fileInfo.get('blkSize')
+        if self.header[:4].encode('hex') == '04224d18':
+            self.dCtx = lz4f.createDecompContext()
+            self.fileInfo = lz4f.getFrameInfo(self.header, self.dCtx)
+            self.blkSizeID = self.fileInfo.get('blkSize')
+        else:
+            raise IOError
         if seekable:
             try:
                 self.load_blocks()
             except:
-                print('Unable to load blockDict. Possibly not a lz4 file.')
-                raise
+                #print('Unable to load blockDict. Possibly not a lz4 file.')
+                raise IOError
     @classmethod
     def open(cls, name = None, fileObj = None, seekable=True):
         if not name and not fileObj:
