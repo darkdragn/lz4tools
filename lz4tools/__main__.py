@@ -9,12 +9,6 @@ try:
 except ImportError:
     import __init__ as lz4tools
 
-def getFileInfo(name):
-    dCtx = lz4tools.lz4f.createDecompContext()
-    with open(name, 'rb') as inFile:
-        header = inFile.read(7)
-    print(lz4tools.lz4f.getFrameInfo(header, dCtx))
-
 parser=argparse.ArgumentParser()
 
 parser.add_argument('-f', action='store_true', dest='file',   default=False,
@@ -52,10 +46,11 @@ prefs = lz4tools.lz4f.makePrefs(res.blkSizeId, res.blkMode)
 compFile = lambda: lz4tools.compressFileDefault(res.input, outname=res.output, prefs=prefs)
 compDir = lambda: lz4tools.compressTarDefault(res.input, outname=res.output, prefs=prefs)
 decompFile = lambda: lz4tools.decompressFileDefault(res.input, outname=res.output)
+getInfo = lambda: lz4tools.getFileInfo(res.input)
 outErr = lambda: sys.stdout.write('Please specify only ony of the comp/decomp options')
 
 if res.info:
-    getFileInfo(res.input)
+    print(getInfo())
 elif res.file:
     if res.tar or res.decomp:
         outErr()

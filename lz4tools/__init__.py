@@ -109,6 +109,18 @@ def decompressFileDefault(name, overwrite=False, outname=None):
                            ' specify a different outfile name.']))
     infile = Lz4File.open(name)
     infile.decompress(outname)
+def getFileInfo(name):
+    """
+    :type string: name - name of file to examine
+    Returns a dict object containing the file's header information.
+    """
+    if not os.path.exists(name):
+        print('Unable to locate the file')
+        return
+    dCtx = lz4f.createDecompContext()
+    with __builtin__.open(name, 'rb') as inFile:
+        header = inFile.read(7)
+    return lz4f.getFrameInfo(header, dCtx)
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)
