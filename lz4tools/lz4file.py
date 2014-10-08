@@ -94,7 +94,7 @@ class Lz4File:
         if size == 0:
             return ''
         if self.pos == self.end:
-            raise EOFError, "Reached EOF"
+            raise EOFError("Reached EOF") 
         if not size:
             size = self.end-self.pos
         out = bytes()

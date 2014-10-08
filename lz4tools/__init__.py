@@ -52,7 +52,7 @@ def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
         out.flush()
         out.close()
     lz4f.freeCompContext(cCtx)
-def compressTarDefault(dirName, overwrite=None, outname=None):
+def compressTarDefault(dirName, overwrite=None, outname=None, prefs=None):
     """
     :type string: dirName   - the name of the dir to tar
     :type bool:   overwrite - overwrite destination
@@ -72,7 +72,7 @@ def compressTarDefault(dirName, overwrite=None, outname=None):
     tarbuff.close()
     buff.seek(0)
     cCtx = lz4f.createCompContext()
-    header = lz4f.compressBegin(cCtx)
+    header = lz4f.compressBegin(cCtx, prefs)
     with __builtin__.open(outname, 'wb') as out:
         out.write(header)
         while True:

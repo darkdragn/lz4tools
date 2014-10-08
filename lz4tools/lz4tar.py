@@ -24,5 +24,5 @@ class Lz4Tar(tarfile.TarFile):
             lz4FileOut.close()
         t._extfileobj = False
         return t
-    tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
-    tarfile.TarFile.lz4open = lz4open
+    #tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
+    #tarfile.TarFile.lz4open = lz4open

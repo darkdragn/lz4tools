@@ -50,7 +50,7 @@ res = parser.parse_args()
 prefs = lz4tools.lz4f.makePrefs(res.blkSizeId, res.blkMode)
 
 compFile = lambda: lz4tools.compressFileDefault(res.input, outname=res.output, prefs=prefs)
-compDir = lambda: lz4tools.compressTarDefault(res.input, outname=res.output)
+compDir = lambda: lz4tools.compressTarDefault(res.input, outname=res.output, prefs=prefs)
 decompFile = lambda: lz4tools.decompressFileDefault(res.input, outname=res.output)
 outErr = lambda: sys.stdout.write('Please specify only ony of the comp/decomp options')
 
