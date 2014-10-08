@@ -67,15 +67,23 @@ def compressTarDefault(dirName, overwrite=None, outname=None):
         print('Unable to locate the directory to compress.')
         return
     buff = StringIO()
-    tarbuff = Lz4Tar.open(fileobj=buff, mode='w|')
+    tarbuff = Lz4Tar.open(fileobj=buff, mode='w')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
+    cCtx = lz4f.createCompContext()
+    header = lz4f.compressBegin(cCtx)
     with __builtin__.open(outname, 'wb') as out:
-        out.write(lz4f.compressFrame(buff.read()))
+        out.write(header)
+        while True:
+            decompData = buff.read((64*(1<<10)))
+            if not decompData:
+                break
+            compData = lz4f.compressUpdate(decompData, cCtx)
+            out.write(compData)
+        out.write(lz4f.compressEnd(cCtx))
         out.flush()
-        out.close()
-    buff.close()
+    lz4f.freeCompContext(cCtx)
     del tarbuff, buff
 def decompressFileDefault(name, overwrite=False, outname=None):
     """
