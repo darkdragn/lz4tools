@@ -9,6 +9,12 @@ try:
 except ImportError:
     import __init__ as lz4tools
 
+def getFileInfo(name):
+    dCtx = lz4tools.lz4f.createDecompContext()
+    with open(name, 'rb') as inFile:
+        header = inFile.read(7)
+    print(lz4tools.lz4f.getFrameInfo(header, dCtx))
+
 parser=argparse.ArgumentParser()
 
 parser.add_argument('-f', action='store_true', dest='file',   default=False,
@@ -17,8 +23,11 @@ parser.add_argument('-t', action='store_true', dest='tar',    default=False,
                     help=''.join(['Compress directory to .tar.lz4. ',
                                   'Default action if input is a directory']))
 parser.add_argument('-d', action='store_true', dest='decomp', default=False,
-                    help=''.join(['Decompress. Default action if the file ends',
-                                  ' in .lz4.']))
+                    help=''.join(['Decompress file. Default action if the file ',
+                                  'ends in .lz4.']))
+parser.add_argument('-i', action='store_true', dest='info', default=False,
+                    help=''.join(['Print frame information from the file\'s ',
+                                  'header.']))
 parser.add_argument('-bs', action='store', dest='blkSizeId', default=7, type=int,
                     help=''.join(['Specify blkSizeId. Valid values are 4-7. ',
                                   'Default value is 7.']), choices=range(4, 8)),
@@ -45,8 +54,9 @@ compDir = lambda: lz4tools.compressTarDefault(res.input, outname=res.output)
 decompFile = lambda: lz4tools.decompressFileDefault(res.input, outname=res.output)
 outErr = lambda: sys.stdout.write('Please specify only ony of the comp/decomp options')
 
-
-if res.file:
+if res.info:
+    getFileInfo(res.input)
+elif res.file:
     if res.tar or res.decomp:
         outErr()
     compFile()
