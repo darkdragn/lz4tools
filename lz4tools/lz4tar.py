@@ -1,19 +1,21 @@
 import sys
 import tarfile
 if sys.version_info.major >= 3:
-    import builtins as __builtin__
     from .lz4file import Lz4File
 else:
-    import __builtin__
     from lz4file import Lz4File
 
 class Lz4Tar(tarfile.TarFile):
     @classmethod
-    def lz4open(cls, name=None, mode='r', fileobj=None):
-        if name and not fileobj:
+    def lz4open(cls, name, mode='r', fileobj=None, **kwargs):
+        try: 
+            import lz4tools
+            Lz4File = lz4tools.Lz4File
+        except (ImportError, AttributeError):
+            raise CompressionError("Lz4file module is not available")
+        if name and fileobj is None:
             try:
                 fileobj = Lz4File.open(name)
-                #fileobj=__builtin__.open(name, 'rb')
             except IOError:
                 raise ReadError('Not a lz4 file')
         elif not name and not fileobj:
@@ -27,8 +29,8 @@ class Lz4Tar(tarfile.TarFile):
             fileobj.close()
         t._extfileobj = False
         return t
-    #tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
-    #tarfile.TarFile.lz4open = lz4open
+    tarfile.TarFile.OPEN_METH.update({'lz4': 'lz4open'})
+    tarfile.TarFile.lz4open = lz4open
     OPEN_METH = {
         "tar": "taropen",   # uncompressed tar
         "gz":  "gzopen",    # gzip compressed tar
