@@ -31,9 +31,10 @@ def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
     if not outname:
         outname = '.'.join([name, 'lz4'])
     if os.path.exists(outname):
-        print('File Exists!')
         if not overwrite:
+            print('File Exists!')
             return
+        print('Overwrite authorized')
     if not os.path.exists(name):
         print('Unable to locate the original file. Please check filename.')
         return

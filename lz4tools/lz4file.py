@@ -2,15 +2,13 @@
 
 import binascii
 import lz4f
-import os
 import struct
 import sys
-import tarfile
 
 if sys.version_info.major >= 3:
-    import builtins as __builtin__
+    from builtins import open as _open
 else:
-    import __builtin__
+    from __builtin__ import open as _open
 
 
 class Lz4File:
@@ -40,7 +38,7 @@ class Lz4File:
         if not name and not fileObj:
             sys.stderr.write('Nothing to open!')
         if not fileObj:
-            fileObj = __builtin__.open(name, 'rb')
+            fileObj = _open(name, 'rb')
         return cls(name, fileObj, seekable)
     def close(self):
         self.fileObj.close()
@@ -49,7 +47,7 @@ class Lz4File:
         :type string: outName
         Generic decompress function. Will decompress the entire file to outName.
         """
-        writeOut = __builtin__.open(outName, 'wb')
+        writeOut = _open(outName, 'wb')
         for blk in self.blkDict.values():
             out = self.read_block(blk=blk)
             writeOut.write(out)
@@ -203,7 +201,6 @@ class Lz4File:
     @property
     def curBlkData(self):
         return self.blkDict.get(self.curBlk)
-    #@property
     def seekable(self):
         if self.blkDict:
             return True
