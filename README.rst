@@ -14,7 +14,7 @@ This package consists of two parts:
 
 Before going any further, I recommend reading up on lz4 at: https://code.google.com/p/lz4/
 
-It is an awesome compression algorithm and I can't than Yann Collet enough for putting together the C implementation and lz4frame.
+It is an awesome compression algorithm and I can't thank Yann Collet enough for putting together the C implementation and lz4frame.
 
 Usage
 -----
@@ -65,12 +65,12 @@ C-Module / Bindings:
         ...     out.flush()
         ...     out.close()
     
-    Advantages and disadvantages: The easy way takes more ram. It reads the contents of the file into a buffer, passes it and compresses it all in one go. With the hard way you can have it read as little or as much as you like. For instance, you can break up the input into 64k chunks. Each chunk could be read, compressed and dropped to disk to conserve ram.
+    Advantages and disadvantages: The easy way takes more ram. It reads the contents of the file into a buffer, passes it and compresses it all in one go. With the hard way you can have it read as little or as much as you like. For instance, you can break up the input into 64kiB chunks. Each chunk could be read, compressed and dropped to disk to conserve ram.
 
 ..
 
 Lz4Tools Module:
-    The lz4file class is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some document strings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
+    The lz4file class is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some docstrings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
 
     lz4tools tar example:
         >>> import lz4tools
@@ -110,10 +110,10 @@ Lz4Tools Module:
             ],
         )
 
-And thus ends the brief tutoral.
+And thus ends the brief tutorial.
 
 Notes
 -----
 
 Version : 
-    The first two digits of the version will always correspond with the version of lz4 that is included. Current version is r123, thus 1.2. The next  digit is correspond to milestone improvements. Example: Once lz4file supports write. The last digit will be slight improvements. Usually some contextual error, or syntax error. Perhaps even a quick fix for python3.4, since I don't use it often, if an issue is brought to my attention, I will provide a quick fix as quickly as possible. 
+    The first two digits of the version will always correspond with the version of lz4 that is included. Current version is r123, thus 1.2. The next digit corresponds to milestone improvements. Example: Once lz4file supports write. The last digit will be slight improvements. Usually some contextual error, or syntax error. Perhaps even a quick fix for python3.4, since I don't use it often, if an issue is brought to my attention, I will provide a quick fix as quickly as possible. 
