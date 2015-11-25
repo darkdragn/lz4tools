@@ -2,12 +2,13 @@ import lz4tools
 import os
 import unittest
 
+
 class TestLZ4File(unittest.TestCase):
 
     def test_1_write(self):
         lz4tools.compressTarDefault('src')
         self.assertTrue(os.path.exists('src.tar.lz4'))
-    
+
     def test_2_file(self):
         testTar = lz4tools.openTar('src.tar.lz4')
         count = testTar.getmembers()
@@ -21,4 +22,3 @@ class TestLZ4File(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
