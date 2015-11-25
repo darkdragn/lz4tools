@@ -7,11 +7,12 @@ else:
     import __builtin__
     from lz4file import Lz4File
 
+
 class Lz4Tar(tarfile.TarFile):
     @classmethod
     def lz4open(cls, name=None, mode='r', fileobj=None):
         if name and not fileobj:
-            fileobj=__builtin__.open(name, 'rb')
+            fileobj = __builtin__.open(name, 'rb')
         elif not name and not fileobj:
             print('Unable to open without a name or fileobj')
             return

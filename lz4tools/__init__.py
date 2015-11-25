@@ -16,6 +16,7 @@ else:
 
 __all__ = ['lz4file', 'lz4tar']
 
+
 def compressFileDefault(name, overwrite=False, outname=None):
     """
     :type string: name      - name of file to compress
@@ -43,7 +44,7 @@ def compressFileDefault(name, overwrite=False, outname=None):
         out.write(header)
         with __builtin__.open(name, 'rb') as infile:
             while True:
-                decompData = infile.read((64*(1<<10)))
+                decompData = infile.read((64*(1 << 10)))
                 if not decompData:
                     break
                 compData = lz4f.compressUpdate(decompData, cCtx)
@@ -52,6 +53,8 @@ def compressFileDefault(name, overwrite=False, outname=None):
         out.flush()
         out.close()
     lz4f.freeCompContext(cCtx)
+
+
 def compressTarDefault(dirName, overwrite=None, outname=None):
     """
     :type string: dirName   - the name of the dir to tar
@@ -77,14 +80,16 @@ def compressTarDefault(dirName, overwrite=None, outname=None):
         out.close()
     buff.close()
     del tarbuff, buff
+
+
 def decompressFileDefault(name, overwrite=False, outname=None):
     """
     :type string: name      - name of file to decompress
     :type bool:   overwrite - overwrite destination
     :type string: outname   - name for decompressed file, not required.
                               Default will be '.'.join([name, 'lz4'])
-    Generic decompress method for a file. Removes .lz4 to original file name for
-    output, unless outname is provided.
+    Generic decompress method for a file. Removes .lz4 to original file name
+    for output, unless outname is provided.
 
     ***WARNING*** Currently uses lz4f.compressFrame, which will read the entire
     original file into memory, then pass to c-module for compression. Avoid
@@ -101,9 +106,13 @@ def decompressFileDefault(name, overwrite=False, outname=None):
                            ' specify a different outfile name.']))
     infile = Lz4File.open(name)
     infile.decompress(outname)
+
+
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)
+
+
 def openTar(name=None, fileObj=None):
     """  Alias for Lz4Tar.open()     """
     return Lz4Tar.lz4open(name, 'r', fileObj)
