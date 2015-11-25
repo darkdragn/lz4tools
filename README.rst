@@ -14,7 +14,7 @@ This package consists of two parts:
 
 Before going any further, I recommend reading up on lz4 at: https://code.google.com/p/lz4/
 
-It is an awesome compression algorithm and I can't than Yann Collet enough for putting together the C implementation and lz4frame.
+It is an awesome compression algorithm and I can't thank Yann Collet enough for putting together the C implementation and lz4frame.
 
 Usage
 -----
