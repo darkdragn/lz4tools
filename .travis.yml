@@ -7,3 +7,6 @@ python:
   - 3.4
 install: 
 script: python setup.py test
+os:
+    - linux
+#    - osx
