@@ -6,22 +6,25 @@ Lz4tools and Lz4f
 
 Overview
 --------
-This package consists of two parts:
+This package consists of three parts:
 
-1. lz4f - C-Module containing python bindings for all lz4frame functions.
-2. lz4tools - a zipfile-like file wrapper class and tarfile-like class for lz4 compressed files. 
-3. lz4toolsCli - a quick cli for using lz4tools static functions.
+  1. lz4f - C-Module containing python bindings for all lz4frame functions.
+  2. lz4tools - a zipfile-like file wrapper class and tarfile-like class for lz4 compressed files. 
+  3. lz4toolsCli - a quick cli for using lz4tools static functions.
 
-Before going any further, I recommend reading up on lz4 at: https://code.google.com/p/lz4/
+Before going any further, I recommend reading up on lz4 at: 
+https://code.google.com/p/lz4/
 
-It is an awesome compression algorithm and I can't thank Yann Collet enough for putting together the C implementation and lz4frame.
+It is an awesome compression algorithm and I can't thank Yann Collet enough for
+putting together the C implementation and lz4frame.
 
 Usage
 -----
 Cli:
-    New addition, there is now a simple Cli for anyone wishing these capabilities would exist directly on the command line.
+    New addition, there is now a simple Cli for anyone wishing these
+    capabilities would exist directly on the command line.
     
-::
+.. code:: bash
 
     $lz4toolsCli
     usage: lz4toolsCli [-h] [-f] [-t] [-d] input [output]
@@ -38,9 +41,14 @@ Cli:
       -d          Decompress. Default action if the file ends in .lz4.
 
 C-Module / Bindings:
-    I would recommend against using lz4f directly except in debug/testing situations. If necessary, a compress or decompress operation first needs a context that will be used with all lz4f functions:
+    I would recommend against using lz4f directly except in debug/testing
+    situations. If necessary, a compress or decompress operation first needs a
+    context that will be used with all lz4f functions:
 
-    lz4f compression the hard way:
+    **lz4f compression the hard way:**
+
+    .. code:: python
+
         >>> import lz4f
         >>> inputFile = open('fileIn', 'rb')
         >>> cCtx = lz4f.createCompressionContext
@@ -57,7 +65,10 @@ C-Module / Bindings:
         >>> inputFile.close()
         >>> del header, data, end
     
-    lz4f compression the easy way:
+    **lz4f compression the easy way:**
+
+    .. code:: python
+
         >>> import lz4f
         >>> with open('output.lz4', 'wb') as out:
         ...     with open('fileIn', 'rb') as inFile:
@@ -65,14 +76,27 @@ C-Module / Bindings:
         ...     out.flush()
         ...     out.close()
     
-    Advantages and disadvantages: The easy way takes more ram. It reads the contents of the file into a buffer, passes it and compresses it all in one go. With the hard way you can have it read as little or as much as you like. For instance, you can break up the input into 64kiB chunks. Each chunk could be read, compressed and dropped to disk to conserve ram.
+    **Advantages and disadvantages:**
+      The easy way takes more ram. It reads the
+      contents of the file into a buffer, passes it and compresses it all in one
+      go. With the hard way you can have it read as little or as much as you
+      like. For instance, you can break up the input into 64kiB chunks.
+      Each chunk could be read, compressed and dropped to disk to conserve ram.
 
-..
+----
 
 Lz4Tools Module:
-    The lz4file class is currently read only. Right now it is a bit rough around the edges, however over the next couple of weeks, I will finish adding some docstrings, and such to make it more user friendly. As soon as I get a chance I will make it write capable. The easiest way to use it is with either the open or openTar methods. That's right! There is a lz4Tar class in the module that is a subclass of tarfile. 
+  The lz4file class is currently read only. Right now it is a bit rough around
+  the edges, however over the next couple of weeks, I will finish adding some
+  docstrings, and such to make it more user friendly. As soon as I get a chance
+  I will make it write capable. The easiest way to use it is with either the
+  open or openTar methods. That's right! There is a lz4Tar class in the module
+  that is a subclass of tarfile. 
 
-    lz4tools tar example:
+  **lz4tools tar example:**
+
+  .. code:: python
+
         >>> import lz4tools
         >>> lz4tools.compressTarDefault('src')
         >>> testTar = lz4tools.openTar('src.tar.lz4')
@@ -89,7 +113,11 @@ Lz4Tools Module:
         -rw-r--r-- darkdragn/darkdragn      14882 2014-09-18 01:28:06 src/lz4.h
         -rw-rw-r-- darkdragn/darkdragn      50141 2014-10-02 23:04:05 src/lz4frame.c
     
-    lz4tools file example:
+
+  **lz4tools file example:**
+
+  .. code:: python
+
         >>> import lz4tools
         >>> lz4tools.compressFileDefault('setup.py')
         >>> testFile = lz4tools.open('setup.py.lz4')
@@ -113,7 +141,13 @@ Lz4Tools Module:
 And thus ends the brief tutorial.
 
 Notes
------
+_____
+  Version: 
+    The first two digits of the version will always correspond with the version
+    of lz4 that is included. Current version is r123, thus 1.2. The next digit
+    corresponds to milestone improvements. Example: Once lz4file supports
+    write. The last digit will be slight improvements. Usually some contextual
+    error, or syntax error. Perhaps even a quick fix for python3.4, since I 
+    don't use it often, if an issue is brought to my attention, I will provide
+    a quick fix as quickly as possible. 
 
-Version : 
-    The first two digits of the version will always correspond with the version of lz4 that is included. Current version is r123, thus 1.2. The next digit corresponds to milestone improvements. Example: Once lz4file supports write. The last digit will be slight improvements. Usually some contextual error, or syntax error. Perhaps even a quick fix for python3.4, since I don't use it often, if an issue is brought to my attention, I will provide a quick fix as quickly as possible. 
