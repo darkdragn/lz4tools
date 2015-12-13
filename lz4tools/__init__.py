@@ -16,8 +16,7 @@ else:
 
 __all__ = ['lz4file', 'lz4tar']
 
-
-def compressFileDefault(name, overwrite=False, outname=None):
+def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
     """
     :type string: name      - name of file to compress
     :type bool:   overwrite - overwrite destination
@@ -32,14 +31,15 @@ def compressFileDefault(name, overwrite=False, outname=None):
     if not outname:
         outname = '.'.join([name, 'lz4'])
     if os.path.exists(outname):
-        print('File Exists!')
         if not overwrite:
+            print('File Exists!')
             return
+        print('Overwrite authorized')
     if not os.path.exists(name):
         print('Unable to locate the original file. Please check filename.')
         return
     cCtx = lz4f.createCompContext()
-    header = lz4f.compressBegin(cCtx)
+    header = lz4f.compressBegin(cCtx, prefs)
     with __builtin__.open(outname, 'wb') as out:
         out.write(header)
         with __builtin__.open(name, 'rb') as infile:
@@ -53,9 +53,7 @@ def compressFileDefault(name, overwrite=False, outname=None):
         out.flush()
         out.close()
     lz4f.freeCompContext(cCtx)
-
-
-def compressTarDefault(dirName, overwrite=None, outname=None):
+def compressTarDefault(dirName, overwrite=None, outname=None, prefs=None):
     """
     :type string: dirName   - the name of the dir to tar
     :type bool:   overwrite - overwrite destination
@@ -70,15 +68,23 @@ def compressTarDefault(dirName, overwrite=None, outname=None):
         print('Unable to locate the directory to compress.')
         return
     buff = StringIO()
-    tarbuff = Lz4Tar.open(fileobj=buff, mode='w|')
+    tarbuff = Lz4Tar.open(fileobj=buff, mode='w')
     tarbuff.add(dirName)
     tarbuff.close()
     buff.seek(0)
+    cCtx = lz4f.createCompContext()
+    header = lz4f.compressBegin(cCtx, prefs)
     with __builtin__.open(outname, 'wb') as out:
-        out.write(lz4f.compressFrame(buff.read()))
+        out.write(header)
+        while True:
+            decompData = buff.read((64*(1<<10)))
+            if not decompData:
+                break
+            compData = lz4f.compressUpdate(decompData, cCtx)
+            out.write(compData)
+        out.write(lz4f.compressEnd(cCtx))
         out.flush()
-        out.close()
-    buff.close()
+    lz4f.freeCompContext(cCtx)
     del tarbuff, buff
 
 
@@ -106,8 +112,18 @@ def decompressFileDefault(name, overwrite=False, outname=None):
                            ' specify a different outfile name.']))
     infile = Lz4File.open(name)
     infile.decompress(outname)
-
-
+def getFileInfo(name):
+    """
+    :type string: name - name of file to examine
+    Returns a dict object containing the file's header information.
+    """
+    if not os.path.exists(name):
+        print('Unable to locate the file')
+        return
+    dCtx = lz4f.createDecompContext()
+    with __builtin__.open(name, 'rb') as inFile:
+        header = inFile.read(7)
+    return lz4f.getFrameInfo(header, dCtx)
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)

@@ -13,6 +13,7 @@ else:
 
 class Lz4File:
     def __init__(self, name, fileObj=None, seekable=True):
+        parseMagic = lambda x: binascii.hexlify(x[:4])
         self.name = name
         if fileObj:
             self.fileObj = fileObj
@@ -20,7 +21,7 @@ class Lz4File:
         else:
             return open(name)
         self.header = fileObj.read(7)
-        if binascii.hexlify(self.header[:4]) == b'04224d18':
+        if parseMagic(self.header) == b'04224d18':
             self.dCtx = lz4f.createDecompContext()
             self.fileInfo = lz4f.getFrameInfo(self.header, self.dCtx)
             self.blkSizeID = self.fileInfo.get('blkSize')

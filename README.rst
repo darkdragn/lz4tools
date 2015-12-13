@@ -18,6 +18,10 @@ https://code.google.com/p/lz4/
 It is an awesome compression algorithm and I can't thank Yann Collet enough for
 putting together the C implementation and lz4frame.
 
+Before going any further, I recommend reading up on lz4 at: https://code.google.com/p/lz4/
+
+It is an awesome compression algorithm and I can't thank Yann Collet enough for putting together the C implementation and lz4frame.
+
 Usage
 -----
 Cli:
@@ -26,19 +30,25 @@ Cli:
     
 .. code:: bash
 
-    $lz4toolsCli
-    usage: lz4toolsCli [-h] [-f] [-t] [-d] input [output]
+    usage: lz4toolsCli [-h] [-f] [-t] [-d] [-i] [-bs {4,5,6,7}] [-bm {0,1}]
+                       input [output]
     
     positional arguments:
-      input       The targeted input.
-      output      Optional output target.
+      input          The targeted input.
+      output         Optional output target.
     
     optional arguments:
-      -h, --help  show this help message and exit
-      -f          Compress file. Default action if input is a file.
-      -t          Compress directory to .tar.lz4. Default action if input is a
-                  directory
-      -d          Decompress. Default action if the file ends in .lz4.
+      -h, --help     show this help message and exit
+      -f             Compress file. Default action if input is a file.
+      -t             Compress directory to .tar.lz4. Default action if input is a
+                     directory
+      -d             Decompress file. Default action if the file ends in .lz4.
+      -i             Print frame information from the file's header.
+      -bs {4,5,6,7}  Specify blkSizeId. Valid values are 4-7. Default value is 7.
+      -bm {0,1}      Specify blkMode. 0 = Chained blocks. 1 = Independent blocks
+                     Default value is 0.
+
+..
 
 C-Module / Bindings:
     I would recommend against using lz4f directly except in debug/testing
@@ -151,3 +161,5 @@ _____
     don't use it often, if an issue is brought to my attention, I will provide
     a quick fix as quickly as possible. 
 
+Version : 
+    The first two digits of the version will always correspond with the version of lz4 that is included. Current version is r124, thus 1.2. The next  digit is correspond to milestone improvements. Example: Once lz4file supports write. The last digit will be slight improvements. Usually some contextual error, or syntax error. Perhaps even a quick fix for python3.4, since I don't use it often, if an issue is brought to my attention, I will provide a quick fix as quickly as possible. 

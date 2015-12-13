@@ -34,8 +34,18 @@ parser.add_argument('-t', action='store_true', dest='tar',    default=False,
                     help=''.join(['Compress directory to .tar.lz4. ',
                                   'Default action if input is a directory']))
 parser.add_argument('-d', action='store_true', dest='decomp', default=False,
-                    help=''.join(['Decompress. Default action if the file ',
+                    help=''.join(['Decompress file. Default action if the file ',
                                   'ends in .lz4.']))
+parser.add_argument('-i', action='store_true', dest='info', default=False,
+                    help=''.join(['Print frame information from the file\'s ',
+                                  'header.']))
+parser.add_argument('-bs', action='store', dest='blkSizeId', default=7, type=int,
+                    help=''.join(['Specify blkSizeId. Valid values are 4-7. ',
+                                  'Default value is 7.']), choices=range(4, 8)),
+parser.add_argument('-bm', action='store', dest='blkMode', default=0, type=int,
+                    help=''.join(['Specify blkMode. 0 = Chained blocks. ',
+                                  '1 = Independent blocks Default value is 0.']),
+                    choices=[0, 1])
 parser.add_argument('input', action='store', help='The targeted input.')
 parser.add_argument('output', action='store', nargs='?', default=None,
                     help='Optional output target.')
@@ -43,7 +53,19 @@ if len(sys.argv) == 1:
     parser.print_help()
     sys.exit()
 res = parser.parse_args()
-if res.file:
+
+#print('blockSizeId: {}'.format(res.blkSizeId))
+prefs = lz4tools.lz4f.makePrefs(res.blkSizeId, res.blkMode)
+
+compFile = lambda: lz4tools.compressFileDefault(res.input, outname=res.output, prefs=prefs)
+compDir = lambda: lz4tools.compressTarDefault(res.input, outname=res.output, prefs=prefs)
+decompFile = lambda: lz4tools.decompressFileDefault(res.input, outname=res.output)
+getInfo = lambda: lz4tools.getFileInfo(res.input)
+outErr = lambda: sys.stdout.write('Please specify only ony of the comp/decomp options')
+
+if res.info:
+    print(getInfo())
+elif res.file:
     if res.tar or res.decomp:
         outErr()
     compFile()
