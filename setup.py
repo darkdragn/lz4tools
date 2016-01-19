@@ -3,7 +3,7 @@
 
 from setuptools import setup, Extension
 
-VERSION = (1, 2, 1, 7)
+VERSION = (1, 3, 1, 2)
 VERSION_STR = ".".join([str(x) for x in VERSION])
 ECA = [
             "-std=c99",
