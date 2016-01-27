@@ -9,7 +9,7 @@ else:
 class Lz4Tar(tarfile.TarFile):
     @classmethod
     def lz4open(cls, name, mode='r', fileobj=None, **kwargs):
-        try: 
+        try:
             import lz4tools
             Lz4File = lz4tools.Lz4File
         except (ImportError, AttributeError):
@@ -22,7 +22,7 @@ class Lz4Tar(tarfile.TarFile):
         elif not name and not fileobj:
             print('Unable to open without a name or fileobj')
             return
-        if not name and hasattr(fileobj.name):
+        if not name and hasattr(fileobj, 'name'):
             name = fileobj.name
         try:
             t = cls(None, mode, fileobj)
