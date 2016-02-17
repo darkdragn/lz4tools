@@ -73,6 +73,8 @@ elif res.tar:
     if res.decomp:
         outErr()
     compDir()
+elif res.decomp:
+    decompFile()
 elif res.input.endswith('lz4'):
     decompFile()
 elif os.path.isfile(res.input):
