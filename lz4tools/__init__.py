@@ -16,6 +16,7 @@ else:
 
 __all__ = ['lz4file', 'lz4tar']
 
+
 def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
     """
     :type string: name      - name of file to compress
@@ -53,7 +54,9 @@ def compressFileDefault(name, overwrite=False, outname=None, prefs=None):
         out.flush()
         out.close()
     lz4f.freeCompContext(cCtx)
-def compressTarDefault(dirName, overwrite=None, outname=None, prefs=None):
+
+
+def compressTarDefault(name, overwrite=None, outname=None, prefs=None):
     """
     :type string: dirName   - the name of the dir to tar
     :type bool:   overwrite - overwrite destination
@@ -63,13 +66,13 @@ def compressTarDefault(dirName, overwrite=None, outname=None, prefs=None):
     Avoid using for large directories, it will consume quite a bit of RAM.
     """
     if not outname:
-        outname = '.'.join([dirName.rstrip('/'), 'tar', 'lz4'])
-    if not os.path.exists(dirName):
+        outname = '.'.join([name.rstrip('/'), 'tar', 'lz4'])
+    if not os.path.exists(name):
         print('Unable to locate the directory to compress.')
         return
     buff = StringIO()
     tarbuff = Lz4Tar.open(fileobj=buff, mode='w')
-    tarbuff.add(dirName)
+    tarbuff.add(name)
     tarbuff.close()
     buff.seek(0)
     cCtx = lz4f.createCompContext()
@@ -77,7 +80,7 @@ def compressTarDefault(dirName, overwrite=None, outname=None, prefs=None):
     with __builtin__.open(outname, 'wb') as out:
         out.write(header)
         while True:
-            decompData = buff.read((64*(1<<10)))
+            decompData = buff.read((64*(1 << 10)))
             if not decompData:
                 break
             compData = lz4f.compressUpdate(decompData, cCtx)
@@ -102,7 +105,7 @@ def decompressFileDefault(name, overwrite=False, outname=None):
     using this for large files until migrated to advCompress functions.
     """
     if not outname:
-        outname = name.strip('.lz4')
+        outname = name.replace('.lz4', '')
         if outname == name:
             print(''.join(['File does not contain .lz4 extension. ',
                            'Please provide outname.']))
@@ -112,6 +115,8 @@ def decompressFileDefault(name, overwrite=False, outname=None):
                            ' specify a different outfile name.']))
     infile = Lz4File.open(name)
     infile.decompress(outname)
+
+
 def getFileInfo(name):
     """
     :type string: name - name of file to examine
@@ -124,6 +129,8 @@ def getFileInfo(name):
     with __builtin__.open(name, 'rb') as inFile:
         header = inFile.read(7)
     return lz4f.getFrameInfo(header, dCtx)
+
+
 def open(name=None, fileObj=None):
     """  Alias for Lz4File.open()    """
     return Lz4File.open(name, fileObj)
