@@ -19,7 +19,8 @@ class Lz4File:
             self.fileObj = fileObj
             self.compEnd = self.tell_end()
         else:
-            return open(name)
+            self.fileObj = _open(name)
+            self.compEnd = self.tell_end()
         self.header = fileObj.read(7)
         if parseMagic(self.header) == b'04224d18':
             self.dCtx = lz4f.createDecompContext()
@@ -107,7 +108,7 @@ class Lz4File:
         if size == 0:
             return ''
         if self.pos == self.end:
-            raise EOFError("Reached EOF")
+            return ""
         if not size or self.pos+size > self.end:
             size = self.end-self.pos
         newPos = self.pos+size
