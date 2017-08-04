@@ -57,7 +57,7 @@ C-Module / Bindings:
 
         >>> import lz4f
         >>> inputFile = open('fileIn', 'rb')
-        >>> cCtx = lz4f.createCompressionContext
+        >>> cCtx = lz4f.createCompContext
         >>> header = lz4f.compressBegin(cCtx)
         >>> data = lz4f.compressUpdate(inputFile.read(), cCtx)
         >>> end = lz4f.compressEnd(cCtx)
